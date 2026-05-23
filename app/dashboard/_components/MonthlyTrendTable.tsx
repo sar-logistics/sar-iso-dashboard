@@ -6,24 +6,29 @@ import { DrillDownModal, DrillContext } from "./DrillDownModal";
 
 export interface MonthlyTrendData {
   months: { key: string; label: string; year: number; month: number }[];
-  rows: CustomerBlock[];
-  grandTotal: CustomerBlock;
+  rows: GroupBlock[];
+  grandTotal: GroupBlock;
 }
 
-export interface CustomerBlock {
-  customer: string;
+export interface GroupBlock {
+  group: string; // customer name OR "POL → POD"
   metrics: MetricRow[];
 }
 
 export interface MetricRow {
-  label: string; // "Revenue" | "Detention" | "Export" | "M&R"
+  label: string;
   total: number;
   monthly: Record<string, number>;
-  isPrimary?: boolean;
+  level: "primary" | "subtotal" | "detail";
+  bucket?: "Detention" | "Export" | "M&R";
+  chargeName?: string;
 }
 
 interface Props {
   data: MonthlyTrendData;
+  /** "customer" or "tradeLane" — affects how group labels & avatars render */
+  groupBy: "customer" | "tradeLane";
+  title: string;
 }
 
 function fmtCompact(n: number): string {
@@ -34,22 +39,60 @@ function fmtCompact(n: number): string {
   if (abs >= 1_000) return `${sign}$${(abs / 1_000).toFixed(1)}K`;
   return `${sign}$${abs.toFixed(0)}`;
 }
-
 function cellClass(n: number): string {
   if (n === 0) return "text-ink-tertiary";
   return n < 0 ? "num-neg" : "";
 }
 
-export function MonthlyTrendTable({ data }: Props) {
+export function MonthlyTrendTable({ data, groupBy, title }: Props) {
   const { months, rows, grandTotal } = data;
   const [drill, setDrill] = useState<DrillContext | null>(null);
+
+  const openDrill = (
+    group: string,
+    isGrand: boolean,
+    metric: MetricRow,
+    mo: typeof months[number]
+  ) => {
+    let customer: string | null = null;
+    let pol: string | null = null;
+    let pod: string | null = null;
+    let groupLabel: string;
+
+    if (groupBy === "customer") {
+      customer = isGrand ? null : group;
+      groupLabel = isGrand ? "All Customers" : titleCase(group);
+    } else {
+      if (!isGrand) {
+        const [p, q] = group.split(" → ");
+        pol = p === "—" ? null : p;
+        pod = q === "—" ? null : q;
+      }
+      groupLabel = isGrand ? "All Trade Lanes" : group;
+    }
+
+    setDrill({
+      customer,
+      pol,
+      pod,
+      customerLabel: groupLabel,
+      year: mo.year,
+      month: mo.month,
+      monthLabel: mo.label,
+      head: metric.label,
+      bucket: metric.bucket || null,
+      chargeName: metric.chargeName || null,
+      level: metric.level,
+      cellTotal: metric.monthly[mo.key] || 0,
+    });
+  };
 
   return (
     <>
       <div className="card overflow-hidden">
         <div className="px-4 py-3 border-b border-surface-border flex items-center justify-between">
           <div className="text-[11px] uppercase tracking-wider text-ink-tertiary">
-            Sales · Customer · Monthly Trend
+            {title}
           </div>
           <div className="text-[11px] text-ink-tertiary">
             Click any number for details · Monthly · USD
@@ -60,13 +103,13 @@ export function MonthlyTrendTable({ data }: Props) {
           <table className="trend-table">
             <thead>
               <tr>
-                <th className="left min-w-[200px]">Customer</th>
-                <th className="left min-w-[120px]">Metric</th>
+                <th className="left min-w-[200px]">
+                  {groupBy === "customer" ? "Customer" : "Trade Lane (POL → POD)"}
+                </th>
+                <th className="left min-w-[180px]">Metric / Charge Name</th>
                 <th className="min-w-[110px] bg-surface-subtle/80">Grand Total</th>
                 {months.map((m) => (
-                  <th key={m.key} className="min-w-[80px]">
-                    {m.label}
-                  </th>
+                  <th key={m.key} className="min-w-[80px]">{m.label}</th>
                 ))}
               </tr>
             </thead>
@@ -76,64 +119,22 @@ export function MonthlyTrendTable({ data }: Props) {
                 block={grandTotal}
                 months={months}
                 isGrand
-                onDrill={(metric, mo) =>
-                  setDrill({
-                    customer: null,
-                    customerLabel: "All Customers",
-                    year: mo.year,
-                    month: mo.month,
-                    monthLabel: mo.label,
-                    head: metric.label,
-                    cellTotal: metric.monthly[mo.key] || 0,
-                  })
-                }
-                onDrillTotal={(metric) =>
-                  setDrill({
-                    customer: null,
-                    customerLabel: "All Customers",
-                    // Use the latest month's year/month for the API call when clicking Grand Total?
-                    // Simpler: don't open modal on Grand Total cells (no single month to filter by)
-                    year: 0,
-                    month: 0,
-                    monthLabel: "Grand Total",
-                    head: metric.label,
-                    cellTotal: metric.total,
-                  })
-                }
+                groupBy={groupBy}
+                onDrill={(m, mo) => openDrill(grandTotal.group, true, m, mo)}
               />
               {rows.map((block) => (
                 <BlockRows
-                  key={block.customer}
+                  key={block.group}
                   block={block}
                   months={months}
-                  onDrill={(metric, mo) =>
-                    setDrill({
-                      customer: block.customer,
-                      customerLabel: titleCase(block.customer),
-                      year: mo.year,
-                      month: mo.month,
-                      monthLabel: mo.label,
-                      head: metric.label,
-                      cellTotal: metric.monthly[mo.key] || 0,
-                    })
-                  }
-                  onDrillTotal={(metric) =>
-                    setDrill({
-                      customer: block.customer,
-                      customerLabel: titleCase(block.customer),
-                      year: 0,
-                      month: 0,
-                      monthLabel: "Grand Total",
-                      head: metric.label,
-                      cellTotal: metric.total,
-                    })
-                  }
+                  groupBy={groupBy}
+                  onDrill={(m, mo) => openDrill(block.group, false, m, mo)}
                 />
               ))}
               {rows.length === 0 && (
                 <tr>
                   <td colSpan={3 + months.length} className="left text-ink-tertiary py-6">
-                    No sales data in the selected range.
+                    No data in the selected range.
                   </td>
                 </tr>
               )}
@@ -142,10 +143,7 @@ export function MonthlyTrendTable({ data }: Props) {
         </div>
       </div>
 
-      <DrillDownModal
-        ctx={drill && drill.year > 0 ? drill : null}
-        onClose={() => setDrill(null)}
-      />
+      <DrillDownModal ctx={drill} onClose={() => setDrill(null)} />
     </>
   );
 }
@@ -154,43 +152,65 @@ function BlockRows({
   block,
   months,
   isGrand = false,
+  groupBy,
   onDrill,
-  onDrillTotal,
 }: {
-  block: CustomerBlock;
+  block: GroupBlock;
   months: { key: string; label: string; year: number; month: number }[];
   isGrand?: boolean;
+  groupBy: "customer" | "tradeLane";
   onDrill: (m: MetricRow, mo: typeof months[number]) => void;
-  onDrillTotal: (m: MetricRow) => void;
 }) {
   const metrics = block.metrics;
+  const groupLabel =
+    isGrand
+      ? block.group
+      : groupBy === "customer"
+      ? titleCase(block.group)
+      : block.group; // trade lane displayed as-is
+
+  const avatarSource =
+    isGrand ? "TT" : groupBy === "customer" ? block.group : block.group.replace(" → ", " ");
+
   return (
     <>
       {metrics.map((m, i) => {
-        const rowClass = m.isPrimary
-          ? isGrand
-            ? "total-row"
-            : "subtotal-row"
-          : "metric-row";
+        const rowClass =
+          m.level === "primary"
+            ? isGrand ? "total-row" : "subtotal-row"
+            : m.level === "subtotal"
+            ? "bucket-row"
+            : "detail-row";
+
+        const labelIndent = m.level === "detail" ? "pl-6" : m.level === "subtotal" ? "pl-2" : "";
+        const labelStyle =
+          m.level === "primary"
+            ? "font-semibold"
+            : m.level === "subtotal"
+            ? "font-medium text-ink-secondary"
+            : "italic text-ink-tertiary text-[12px]";
+
         return (
-          <tr key={m.label} className={rowClass}>
+          <tr key={`${m.label}-${i}`} className={rowClass}>
             {i === 0 ? (
               <td className="left align-top" rowSpan={metrics.length}>
                 <div className="flex items-center gap-2 pt-1">
-                  <CustomerAvatar name={isGrand ? "TT" : block.customer} />
-                  <span className={isGrand ? "font-semibold" : ""}>
-                    {isGrand ? "ALL CUSTOMERS" : titleCase(block.customer)}
+                  <CustomerAvatar name={avatarSource} />
+                  <span className={isGrand ? "font-semibold" : "font-medium"}>
+                    {groupLabel}
                   </span>
                 </div>
               </td>
             ) : null}
-            <td className="left">
-              <span className={m.isPrimary ? "font-medium" : "italic text-ink-tertiary"}>
-                {m.label}
+            <td className={`left ${labelIndent}`}>
+              <span className={labelStyle}>
+                {m.level === "detail" ? `↳ ${titleCase(m.label)}` : m.label}
               </span>
             </td>
             <td className={`bg-surface-subtle/40 ${cellClass(m.total)}`}>
-              <span className={m.isPrimary ? "font-semibold" : ""}>{fmtCompact(m.total)}</span>
+              <span className={m.level === "primary" ? "font-semibold" : ""}>
+                {fmtCompact(m.total)}
+              </span>
             </td>
             {months.map((mo) => {
               const v = m.monthly[mo.key] || 0;
@@ -200,7 +220,7 @@ function BlockRows({
                     <button
                       onClick={() => onDrill(m, mo)}
                       className="hover:underline hover:text-info-text transition-colors cursor-pointer"
-                      title={`Click for ${m.label} details — ${mo.label}`}
+                      title={`Click for details — ${mo.label}`}
                     >
                       {fmtCompact(v)}
                     </button>

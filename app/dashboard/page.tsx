@@ -60,16 +60,19 @@ async function loadKpis() {
 
 export default async function DashboardHome() {
   const k = await loadKpis();
-  const trend = await buildMonthlyTrend(10);
-  const range = monthRangeLabel(trend.months);
+  const [customerTrend, tradeLaneTrend] = await Promise.all([
+    buildMonthlyTrend("customer", 10),
+    buildMonthlyTrend("tradeLane", 10),
+  ]);
+  const range = monthRangeLabel(customerTrend.months);
 
   return (
     <div className="p-6 max-w-[1600px] mx-auto">
       <div className="flex items-end justify-between mb-5">
         <div>
-          <h1 className="text-xl font-semibold text-ink-primary">Business Summary</h1>
+          <h1 className="text-xl font-semibold text-ink-primary">Sales Performance</h1>
           <p className="text-xs text-ink-tertiary mt-0.5">
-            ISO Tank · Sales · M&amp;R · Finance overview
+            ISO Tank · Sales overview by customer, trade lane and charge head
           </p>
         </div>
         <SyncButton />
@@ -83,49 +86,48 @@ export default async function DashboardHome() {
       />
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
-        <KPICard
-          label="Total Revenue"
-          value={k.totalRevenue}
+        <KPICard label="Total Revenue" value={k.totalRevenue}
           subtitle={`Across ${k.totalRows.toLocaleString("en-IN")} invoice lines`}
-          accent="bg-accent-green"
-        />
-        <KPICard
-          label="Principal Revenue"
-          value={k.principal}
-          subtitle="Owner-side lease & freight"
-          accent="bg-accent-blue"
-        />
-        <KPICard
-          label="Sub-Lease Revenue"
-          value={k.subLease}
-          subtitle="Sub-leased tank income"
-          accent="bg-accent-purple"
-        />
-        <KPICard
-          label="Detention Revenue"
-          value={k.detention}
-          subtitle="POD + Loading detention"
-          accent="bg-accent-orange"
-        />
-        <KPICard
-          label="Export Revenue"
-          value={k.exportRev}
-          subtitle="Ocean freight charges"
-          accent="bg-accent-yellow"
-        />
-        <KPICard
-          label="M&R Revenue"
-          value={k.mrRevenue}
-          subtitle="Repair & cleaning recovery"
-          accent="bg-accent-pink"
-        />
+          accent="bg-accent-green" />
+        <KPICard label="Principal Revenue" value={k.principal}
+          subtitle="Owner-side lease & freight" accent="bg-accent-blue" />
+        <KPICard label="Sub-Lease Revenue" value={k.subLease}
+          subtitle="Sub-leased tank income" accent="bg-accent-purple" />
+        <KPICard label="Detention Revenue" value={k.detention}
+          subtitle="POD + Loading detention" accent="bg-accent-orange" />
+        <KPICard label="Export Revenue" value={k.exportRev}
+          subtitle="Ocean freight charges" accent="bg-accent-yellow" />
+        <KPICard label="M&R Revenue" value={k.mrRevenue}
+          subtitle="Repair & cleaning recovery" accent="bg-accent-pink" />
       </div>
 
-      <MonthlyTrendTable data={trend} />
+      <section className="mb-8">
+        <h2 className="text-sm font-semibold text-ink-primary mb-3 flex items-center gap-2">
+          <span className="w-1 h-4 rounded-full bg-accent-green inline-block" />
+          Customer Performance
+        </h2>
+        <MonthlyTrendTable
+          data={customerTrend}
+          groupBy="customer"
+          title="Customer · Monthly Trend"
+        />
+      </section>
+
+      <section>
+        <h2 className="text-sm font-semibold text-ink-primary mb-3 flex items-center gap-2">
+          <span className="w-1 h-4 rounded-full bg-accent-blue inline-block" />
+          Trade Lane Performance
+        </h2>
+        <MonthlyTrendTable
+          data={tradeLaneTrend}
+          groupBy="tradeLane"
+          title="Trade Lane (POL → POD) · Monthly Trend"
+        />
+      </section>
 
       {k.creditNotes !== 0 && (
         <div className="mt-4 text-xs text-ink-tertiary">
-          Note: Credit Notes of {fmtSign(k.creditNotes)} are excluded from the trend table but included in Total Revenue.
+          Note: Credit Notes of {fmtSign(k.creditNotes)} are excluded from the trend tables but included in Total Revenue.
         </div>
       )}
     </div>

@@ -16,17 +16,20 @@ interface DetailRow {
   rate: number;
   chargeCurrency: string;
   amountInChargeCurrency: number;
-  shipperName: string;
-  consigneeName: string;
 }
 
 export interface DrillContext {
-  customer: string | null; // null = ALL CUSTOMERS
+  customer: string | null;
+  pol: string | null;
+  pod: string | null;
   customerLabel: string;
   year: number;
   month: number;
   monthLabel: string;
   head: string;
+  bucket: "Detention" | "Export" | "M&R" | null;
+  chargeName: string | null;
+  level: "primary" | "subtotal" | "detail";
   cellTotal: number;
 }
 
@@ -47,12 +50,18 @@ export function DrillDownModal({ ctx, onClose }: Props) {
     if (!ctx) return;
     setLoading(true);
     setError(null);
+
     const params = new URLSearchParams({
       year: String(ctx.year),
       month: String(ctx.month),
+      level: ctx.level,
       head: ctx.head,
     });
     if (ctx.customer) params.set("customer", ctx.customer);
+    if (ctx.pol) params.set("pol", ctx.pol);
+    if (ctx.pod) params.set("pod", ctx.pod);
+    if (ctx.bucket) params.set("bucket", ctx.bucket);
+    if (ctx.chargeName) params.set("chargeName", ctx.chargeName);
 
     fetch(`/api/sales/detail?${params}`)
       .then(async (r) => {
@@ -72,6 +81,15 @@ export function DrillDownModal({ ctx, onClose }: Props) {
 
   if (!ctx) return null;
 
+  const subtitle = ctx.chargeName
+    ? titleCase(ctx.chargeName)
+    : ctx.bucket
+    ? `${ctx.bucket} (all charges)`
+    : ctx.head;
+
+  const showCustomer = !ctx.customer;
+  const showPolPod = !!(ctx.pol || ctx.pod) ? false : true;
+
   return (
     <div
       className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"
@@ -81,13 +99,12 @@ export function DrillDownModal({ ctx, onClose }: Props) {
         className="bg-white rounded-lg shadow-xl max-w-7xl w-full max-h-[90vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
         <div className="px-5 py-4 border-b border-surface-border flex items-start justify-between">
           <div>
             <div className="text-sm font-semibold text-ink-primary">
-              {ctx.customerLabel} · {ctx.head} · {ctx.monthLabel}
+              {ctx.customerLabel} · {subtitle} · {ctx.monthLabel}
             </div>
-            <div className="text-xs text-ink-tertiary mt-1 flex items-center gap-3">
+            <div className="text-xs text-ink-tertiary mt-1 flex items-center gap-3 flex-wrap">
               <span>
                 Total: <span className="font-semibold text-ink-primary">{fmtUSD(total)}</span>
               </span>
@@ -109,7 +126,6 @@ export function DrillDownModal({ ctx, onClose }: Props) {
           </button>
         </div>
 
-        {/* Body */}
         <div className="flex-1 overflow-auto">
           {loading ? (
             <div className="p-8 text-center text-ink-tertiary">Loading…</div>
@@ -123,9 +139,11 @@ export function DrillDownModal({ ctx, onClose }: Props) {
                 <tr className="text-[11px] uppercase tracking-wider text-ink-tertiary">
                   <th className="px-3 py-2.5 text-left">Date</th>
                   <th className="px-3 py-2.5 text-left">Invoice No</th>
-                  {!ctx.customer && <th className="px-3 py-2.5 text-left">Customer</th>}
+                  {showCustomer && <th className="px-3 py-2.5 text-left">Customer</th>}
                   <th className="px-3 py-2.5 text-left">Charge Name</th>
-                  <th className="px-3 py-2.5 text-left">Trade Lane (POL → POD)</th>
+                  {showPolPod && (
+                    <th className="px-3 py-2.5 text-left">Trade Lane (POL → POD)</th>
+                  )}
                   <th className="px-3 py-2.5 text-right">Qty</th>
                   <th className="px-3 py-2.5 text-right">Rate</th>
                   <th className="px-3 py-2.5 text-right">Amount</th>
@@ -146,15 +164,17 @@ export function DrillDownModal({ ctx, onClose }: Props) {
                     <td className="px-3 py-2 font-mono text-[11px] text-ink-secondary whitespace-nowrap">
                       {r.invoiceNo}
                     </td>
-                    {!ctx.customer && (
+                    {showCustomer && (
                       <td className="px-3 py-2 text-ink-primary">{titleCase(r.partyName)}</td>
                     )}
                     <td className="px-3 py-2 text-ink-primary">{titleCase(r.chargeName)}</td>
-                    <td className="px-3 py-2 text-xs text-ink-secondary whitespace-nowrap">
-                      <span>{r.pol || "—"}</span>
-                      <span className="mx-1.5 text-ink-tertiary">→</span>
-                      <span>{r.pod || "—"}</span>
-                    </td>
+                    {showPolPod && (
+                      <td className="px-3 py-2 text-xs text-ink-secondary whitespace-nowrap">
+                        <span>{r.pol || "—"}</span>
+                        <span className="mx-1.5 text-ink-tertiary">→</span>
+                        <span>{r.pod || "—"}</span>
+                      </td>
+                    )}
                     <td className="px-3 py-2 text-right tabular-nums text-ink-secondary">
                       {r.qty ? r.qty.toLocaleString("en-IN") : "—"}
                     </td>
@@ -169,7 +189,10 @@ export function DrillDownModal({ ctx, onClose }: Props) {
               </tbody>
               <tfoot className="bg-surface-subtle">
                 <tr className="text-xs font-semibold">
-                  <td className="px-3 py-2.5 text-left" colSpan={!ctx.customer ? 7 : 6}>
+                  <td
+                    className="px-3 py-2.5 text-left"
+                    colSpan={2 + (showCustomer ? 1 : 0) + 1 + (showPolPod ? 1 : 0) + 2}
+                  >
                     Total
                   </td>
                   <td className="px-3 py-2.5 text-right tabular-nums">{fmtUSD(total)}</td>

@@ -2,29 +2,25 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { getDb } from "@/lib/mongodb";
 
-/**
- * GET /api/sales/detail?customer=X&year=2025&month=4&head=Detention
- * Returns invoice lines making up a single cell of the Monthly Trend table.
- * If `customer` is omitted, returns rows across all customers (used by the
- * ALL CUSTOMERS row in the table).
- */
 export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { searchParams } = new URL(req.url);
-  const customer = searchParams.get("customer") || null;
-  const year = parseInt(searchParams.get("year") || "0", 10);
-  const month = parseInt(searchParams.get("month") || "0", 10);
-  const head = searchParams.get("head") || "";
+  const sp = new URL(req.url).searchParams;
+  const customer = sp.get("customer") || null;
+  const pol = sp.get("pol") || null;
+  const pod = sp.get("pod") || null;
+  const year = parseInt(sp.get("year") || "0", 10);
+  const month = parseInt(sp.get("month") || "0", 10);
+  const head = sp.get("head") || "";
+  const bucket = sp.get("bucket") || null;
+  const chargeName = sp.get("chargeName") || null;
+  const level = sp.get("level") || "primary";
 
-  if (!year || !month || !head) {
-    return NextResponse.json(
-      { error: "Missing year, month, or head" },
-      { status: 400 }
-    );
+  if (!year || !month) {
+    return NextResponse.json({ error: "Missing year or month" }, { status: 400 });
   }
 
   const filter: any = {
@@ -33,14 +29,19 @@ export async function GET(req: NextRequest) {
     revenueCategory: { $ne: "Credit Note" },
   };
   if (customer) filter.partyName = customer;
+  if (pol) filter.pol = pol;
+  if (pod) filter.pod = pod;
 
-  // Bucket logic mirrors lib/trend.ts so cell totals match drill-down sums
-  if (head === "Detention") filter.revenueHead = "Detention";
-  else if (head === "Export") filter.revenueHead = "Export";
-  else if (head === "M&R") filter.revenueHead = "M&R";
-  else if (head === "Revenue") filter.revenueHead = { $in: ["Lease", "Other"] };
-  else {
-    return NextResponse.json({ error: "Invalid head" }, { status: 400 });
+  // Apply head/bucket/charge filtering matching the row that was clicked
+  if (level === "detail" && chargeName) {
+    filter.chargeName = chargeName;
+    if (bucket) filter.revenueHead = bucket;
+  } else if (level === "subtotal" && bucket) {
+    filter.revenueHead = bucket;
+  } else if (head === "Revenue") {
+    filter.revenueHead = { $in: ["Lease", "Other"] };
+  } else if (head === "Detention" || head === "Export" || head === "M&R") {
+    filter.revenueHead = head;
   }
 
   const db = await getDb();
@@ -59,8 +60,6 @@ export async function GET(req: NextRequest) {
         rate: 1,
         chargeCurrency: 1,
         amountInChargeCurrency: 1,
-        shipperName: 1,
-        consigneeName: 1,
       },
     })
     .sort({ invoiceDate: -1 })

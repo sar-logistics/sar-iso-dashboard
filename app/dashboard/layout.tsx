@@ -31,12 +31,6 @@ export default async function DashboardLayout({
             <Link href="/dashboard" className="sidebar-link sidebar-link-active">
               Sales Performance
             </Link>
-            <div className="space-y-0.5 opacity-50 mt-0.5">
-              <div className="sidebar-link cursor-not-allowed">Revenue Breakup</div>
-              <div className="sidebar-link cursor-not-allowed">Detention</div>
-              <div className="sidebar-link cursor-not-allowed">Monthly Export</div>
-              <div className="sidebar-link cursor-not-allowed">Lease Report</div>
-            </div>
           </div>
 
           <div>

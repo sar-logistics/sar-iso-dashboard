@@ -14,24 +14,12 @@
     @apply bg-white rounded-lg border border-surface-border shadow-sm;
   }
 
-  /* KPI card with top accent bar (reference design) */
-  .kpi-card {
-    @apply bg-white rounded-lg border border-surface-border overflow-hidden;
-  }
-  .kpi-bar {
-    @apply h-1 w-full;
-  }
-  .kpi-label {
-    @apply text-[11px] font-semibold uppercase tracking-wider text-ink-tertiary;
-  }
-  .kpi-value {
-    @apply text-2xl font-bold text-ink-primary tabular-nums mt-2;
-  }
-  .kpi-sub {
-    @apply text-[11px] text-ink-tertiary mt-2;
-  }
+  .kpi-card { @apply bg-white rounded-lg border border-surface-border overflow-hidden; }
+  .kpi-bar { @apply h-1 w-full; }
+  .kpi-label { @apply text-[11px] font-semibold uppercase tracking-wider text-ink-tertiary; }
+  .kpi-value { @apply text-2xl font-bold text-ink-primary tabular-nums mt-2; }
+  .kpi-sub { @apply text-[11px] text-ink-tertiary mt-2; }
 
-  /* Filter bar */
   .filter-chip {
     @apply text-xs border border-surface-border rounded-md px-3 py-1.5
            bg-white text-ink-primary inline-flex items-center gap-1.5;
@@ -40,10 +28,7 @@
     @apply text-[11px] font-semibold uppercase tracking-wider text-ink-tertiary;
   }
 
-  /* Trend table */
-  .trend-table {
-    @apply w-full text-sm border-collapse;
-  }
+  .trend-table { @apply w-full text-sm border-collapse; }
   .trend-table th {
     @apply text-[11px] font-semibold uppercase tracking-wider text-ink-tertiary
            bg-surface-subtle px-3 py-2.5 text-right border-b border-surface-border;
@@ -54,19 +39,15 @@
            border-b border-surface-border;
   }
   .trend-table td.left { @apply text-left; }
-  .trend-table tr.metric-row td {
-    @apply text-xs text-ink-secondary py-1.5;
-  }
-  .trend-table tr.total-row td {
-    @apply bg-sales/30 font-semibold text-ink-primary py-2.5;
-  }
-  .trend-table tr.subtotal-row td {
-    @apply bg-surface-subtle font-medium text-ink-primary;
-  }
+
+  .trend-table tr.total-row td      { @apply bg-sales/30 font-semibold text-ink-primary py-2.5; }
+  .trend-table tr.subtotal-row td   { @apply bg-surface-subtle font-medium text-ink-primary; }
+  .trend-table tr.bucket-row td     { @apply bg-white py-1.5; }
+  .trend-table tr.detail-row td     { @apply bg-white text-xs text-ink-secondary py-1; }
+
   .num-pos { @apply text-positive; }
   .num-neg { @apply text-negative; }
 
-  /* Sidebar */
   .sidebar-section-label {
     @apply px-3 text-[11px] font-semibold uppercase tracking-wider mb-1;
   }
