@@ -1,4 +1,4 @@
-import { Calendar, ChevronDown, Filter, ArrowUpDown, Trophy, RefreshCw } from "lucide-react";
+import { Calendar, ChevronDown, Filter, ArrowUpDown } from "lucide-react";
 
 interface FilterBarProps {
   fromLabel: string;
@@ -8,26 +8,25 @@ interface FilterBarProps {
 }
 
 /**
- * Top filter strip — visual only for Phase 2A.
- * In Phase 2B these become interactive (date picker, customer filter, etc.).
+ * Top filter strip. Currently visual — Phase 2C will make these interactive.
  */
 export function FilterBar({ fromLabel, toLabel, lastSyncedAt, rowsSynced }: FilterBarProps) {
   return (
     <div className="bg-white border border-surface-border rounded-lg px-4 py-3 mb-6 flex items-center gap-x-5 gap-y-2 flex-wrap">
       <div className="flex items-center gap-2">
         <span className="filter-label">Report View</span>
-        <button className="filter-chip">
+        <button className="filter-chip" disabled>
           Monthly View <ChevronDown size={12} />
         </button>
       </div>
 
       <div className="flex items-center gap-2">
         <span className="filter-label">From</span>
-        <button className="filter-chip">
+        <button className="filter-chip" disabled>
           <Calendar size={12} /> {fromLabel}
         </button>
         <span className="filter-label">To</span>
-        <button className="filter-chip">
+        <button className="filter-chip" disabled>
           <Calendar size={12} /> {toLabel}
         </button>
       </div>
@@ -36,19 +35,16 @@ export function FilterBar({ fromLabel, toLabel, lastSyncedAt, rowsSynced }: Filt
         <span className="filter-label">Currency</span>
         <div className="flex items-center border border-surface-border rounded-md overflow-hidden">
           <button className="px-3 py-1.5 text-xs font-medium bg-info/40 text-info-text">USD</button>
-          <button className="px-3 py-1.5 text-xs font-medium text-ink-tertiary hover:bg-surface-muted">INR</button>
+          <button className="px-3 py-1.5 text-xs font-medium text-ink-tertiary hover:bg-surface-muted" disabled>INR</button>
         </div>
       </div>
 
       <div className="ml-auto flex items-center gap-3">
-        <button className="filter-chip hover:bg-surface-muted">
+        <button className="filter-chip hover:bg-surface-muted" disabled>
           <Filter size={12} /> Filters
         </button>
-        <button className="filter-chip hover:bg-surface-muted">
+        <button className="filter-chip hover:bg-surface-muted" disabled>
           <ArrowUpDown size={12} /> Sort
-        </button>
-        <button className="filter-chip hover:bg-surface-muted">
-          <Trophy size={12} /> Leaderboard
         </button>
         {lastSyncedAt && (
           <span className="text-[11px] text-ink-tertiary">

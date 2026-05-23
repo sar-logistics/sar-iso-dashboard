@@ -27,15 +27,11 @@ export default async function DashboardLayout({
 
         <nav className="flex-1 px-2 py-4 space-y-5">
           <div>
-            <div className="sidebar-section-label text-ink-tertiary">Reports</div>
-            <Link href="/dashboard" className="sidebar-link sidebar-link-active">
-              Summary
-            </Link>
-          </div>
-
-          <div>
             <div className="sidebar-section-label text-sales-text">Sales</div>
-            <div className="space-y-0.5 opacity-50">
+            <Link href="/dashboard" className="sidebar-link sidebar-link-active">
+              Sales Performance
+            </Link>
+            <div className="space-y-0.5 opacity-50 mt-0.5">
               <div className="sidebar-link cursor-not-allowed">Revenue Breakup</div>
               <div className="sidebar-link cursor-not-allowed">Detention</div>
               <div className="sidebar-link cursor-not-allowed">Monthly Export</div>

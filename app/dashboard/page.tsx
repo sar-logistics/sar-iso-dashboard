@@ -14,7 +14,7 @@ async function loadKpis() {
       {
         $group: {
           _id: "$revenueCategory",
-          total: { $sum: "$amountInLocalCurrency" },
+          total: { $sum: "$amountInChargeCurrency" },
           count: { $sum: 1 },
         },
       },
@@ -32,7 +32,7 @@ async function loadKpis() {
 
   const headAgg = await col
     .aggregate([
-      { $group: { _id: "$revenueHead", total: { $sum: "$amountInLocalCurrency" } } },
+      { $group: { _id: "$revenueHead", total: { $sum: "$amountInChargeCurrency" } } },
     ])
     .toArray();
   const byHead: Record<string, number> = {};

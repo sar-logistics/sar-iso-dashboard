@@ -26,11 +26,11 @@ function monthLabel(y: number, m: number) {
 
 /** Build the past-12-months window ending at the latest month in the data. */
 function buildMonthList(maxYear: number, maxMonth: number) {
-  const list: { key: string; label: string }[] = [];
+  const list: { key: string; label: string; year: number; month: number }[] = [];
   let y = maxYear, m = maxMonth - 11;
   while (m <= 0) { m += 12; y -= 1; }
   for (let i = 0; i < 12; i++) {
-    list.push({ key: monthKey(y, m), label: monthLabel(y, m) });
+    list.push({ key: monthKey(y, m), label: monthLabel(y, m), year: y, month: m });
     m += 1;
     if (m > 12) { m = 1; y += 1; }
   }
@@ -92,7 +92,7 @@ export async function buildMonthlyTrend(topN = 10): Promise<MonthlyTrendData> {
             head: "$revenueHead",
             category: "$revenueCategory",
           },
-          total: { $sum: "$amountInLocalCurrency" },
+          total: { $sum: "$amountInChargeCurrency" },
         },
       },
     ])
