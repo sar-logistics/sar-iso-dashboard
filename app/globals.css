@@ -1,0 +1,22 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body {
+    @apply bg-white text-ink-primary antialiased;
+    font-feature-settings: "cv11", "ss01";
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-white rounded-2xl border border-surface-border p-6 shadow-sm;
+  }
+  .kpi-label {
+    @apply text-xs font-medium uppercase tracking-wider text-ink-tertiary;
+  }
+  .kpi-value {
+    @apply text-3xl font-semibold text-ink-primary mt-2;
+  }
+}
