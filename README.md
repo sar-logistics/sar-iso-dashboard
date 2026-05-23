@@ -6,7 +6,7 @@ Internal management dashboard for SAR's ISO tank leasing & logistics business.
 
 ---
 
-## Phase 1 Setup (you do this once)
+## Phase 1 Setup (you  do this once)
 
 ### 1. Clone and install
 ```bash
