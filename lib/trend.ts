@@ -9,7 +9,7 @@ const PRIMARY = "Revenue" as const;
 const BUCKETS = ["Lease", "Detention", "EXIM", "M&R"] as const;
 type Bucket = (typeof BUCKETS)[number];
 
-export type ViewMode = "monthly" | "quarterly" | "yearly";
+export type ViewMode = "monthly" | "quarterly" | "yearly" | "weekly";
 export type GroupBy = "customer" | "tradeLane";
 
 function bucketFor(
@@ -27,8 +27,25 @@ function bucketFor(
 
 const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
 
+// ISO week computation (week starts Monday, week 1 contains first Thursday of year)
+function getISOWeek(d: Date): { week: number; year: number } {
+  const date = new Date(
+    Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())
+  );
+  const dayNum = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+  const isoYear = date.getUTCFullYear();
+  const yearStart = new Date(Date.UTC(isoYear, 0, 1));
+  const week = Math.ceil(
+    ((date.getTime() - yearStart.getTime()) / 86400000 + 1) / 7
+  );
+  return { week, year: isoYear };
+}
+
 function periodKey(view: ViewMode, year: number, month: number): string {
   switch (view) {
+    case "weekly":
+      return `${year}-W${String(month).padStart(2, "0")}`; // here "month" is actually week number
     case "monthly":
       return `${year}-${String(month).padStart(2, "0")}`;
     case "quarterly":
@@ -40,6 +57,8 @@ function periodKey(view: ViewMode, year: number, month: number): string {
 function periodLabel(view: ViewMode, year: number, month: number): string {
   const yy = String(year).slice(-2);
   switch (view) {
+    case "weekly":
+      return `W${month} '${yy}`;
     case "monthly":
       return `${MONTHS[month - 1]} '${yy}`;
     case "quarterly":
@@ -47,6 +66,28 @@ function periodLabel(view: ViewMode, year: number, month: number): string {
     case "yearly":
       return `FY ${year}`;
   }
+}
+
+/** Build week columns going backward from `toDate`. Returns oldest-first. */
+function buildWeeklyColumns(toDate: Date, numWeeks: number) {
+  const cols: { key: string; label: string; year: number; month: number }[] = [];
+  // Move cursor to Monday of the week containing toDate
+  const cursor = new Date(
+    Date.UTC(toDate.getUTCFullYear(), toDate.getUTCMonth(), toDate.getUTCDate())
+  );
+  const dow = cursor.getUTCDay() || 7;
+  cursor.setUTCDate(cursor.getUTCDate() - dow + 1);
+  for (let i = 0; i < numWeeks; i++) {
+    const { week, year } = getISOWeek(cursor);
+    cols.unshift({
+      key: `${year}-W${String(week).padStart(2, "0")}`,
+      label: `W${week} '${String(year).slice(-2)}`,
+      year,
+      month: week, // store week number in `month` slot — used by drill (period start range)
+    });
+    cursor.setUTCDate(cursor.getUTCDate() - 7);
+  }
+  return cols;
 }
 
 function buildPeriodColumns(
@@ -111,11 +152,54 @@ export async function buildPeriodTrend(
   // Determine date range
   let fromY: number, fromM: number, toY: number, toM: number;
 
-  if (fromDate && toDate) {
-    fromY = fromDate.getUTCFullYear();
-    fromM = fromDate.getUTCMonth() + 1;
-    toY = toDate.getUTCFullYear();
-    toM = toDate.getUTCMonth() + 1;
+  // Determine date range AND build the column list.
+  // For monthly/quarterly/yearly we work in year+month integers.
+  // For weekly we work with actual Date objects (Monday-Sunday ISO weeks).
+
+  let actualFromDate: Date;
+  let actualToDate: Date;
+  let periodCols: { key: string; label: string; year: number; month: number }[];
+
+  if (view === "weekly") {
+    // 5 most recent ISO weeks ending at toDate (or latest data)
+    if (toDate) {
+      actualToDate = toDate;
+    } else {
+      const latest = await col
+        .aggregate([
+          { $match: { invoiceDate: { $ne: null } } },
+          { $group: { _id: null, max: { $max: "$invoiceDate" } } },
+        ])
+        .toArray();
+      if (!latest.length) {
+        return {
+          months: [],
+          rows: [],
+          grandTotal: emptyGroup(
+            groupBy === "customer" ? "ALL CUSTOMERS" : "ALL TRADE LANES"
+          ),
+        };
+      }
+      actualToDate = new Date(latest[0].max);
+    }
+    const numWeeks = 5;
+    periodCols = buildWeeklyColumns(actualToDate, numWeeks);
+    // From-date = Monday of the earliest column
+    const first = periodCols[0];
+    // Find the Monday of that ISO week by stepping back from toDate
+    actualFromDate = new Date(actualToDate);
+    const dow = actualFromDate.getUTCDay() || 7;
+    actualFromDate.setUTCDate(actualFromDate.getUTCDate() - dow + 1);
+    actualFromDate.setUTCDate(actualFromDate.getUTCDate() - 7 * (numWeeks - 1));
+    actualFromDate.setUTCHours(0, 0, 0, 0);
+  } else if (fromDate && toDate) {
+    actualFromDate = fromDate;
+    actualToDate = toDate;
+    const fromY = fromDate.getUTCFullYear();
+    const fromM = fromDate.getUTCMonth() + 1;
+    const toY = toDate.getUTCFullYear();
+    const toM = toDate.getUTCMonth() + 1;
+    periodCols = buildPeriodColumns(view, fromY, fromM, toY, toM);
   } else {
     const dr = await col
       .aggregate([
@@ -138,22 +222,24 @@ export async function buildPeriodTrend(
       };
     }
     const maxYM = dr[0].maxYM as number;
-    toY = Math.floor(maxYM / 100);
-    toM = maxYM % 100;
+    const toY = Math.floor(maxYM / 100);
+    const toM = maxYM % 100;
 
-    // Default range based on view
     let monthsBack: number;
     switch (view) {
-      case "monthly": monthsBack = 11; break;    // 12 months
-      case "quarterly": monthsBack = 23; break;  // 8 quarters
-      case "yearly": monthsBack = 35; break;     // 3 years
+      case "monthly": monthsBack = 11; break;     // 12 months
+      case "quarterly": monthsBack = 23; break;   // 8 quarters
+      case "yearly": monthsBack = 35; break;      // 3 years
+      default: monthsBack = 11;
     }
-    fromY = toY;
-    fromM = toM - monthsBack;
+    let fromY = toY;
+    let fromM = toM - monthsBack;
     while (fromM <= 0) { fromM += 12; fromY -= 1; }
+    periodCols = buildPeriodColumns(view, fromY, fromM, toY, toM);
+    actualFromDate = new Date(Date.UTC(fromY, fromM - 1, 1));
+    actualToDate = new Date(Date.UTC(toY, toM, 0, 23, 59, 59, 999));
   }
 
-  const periodCols = buildPeriodColumns(view, fromY, fromM, toY, toM);
   const periodKeySet = new Set(periodCols.map((c) => c.key));
 
   const groupKeyExpr =
@@ -167,22 +253,20 @@ export async function buildPeriodTrend(
         }
       : "$partyName";
 
-  const fromYM = fromY * 100 + fromM;
-  const toYM = toY * 100 + toM;
-
+  // Always filter by actual invoiceDate range — works for both day-level (custom)
+  // and month-level filtering, and naturally restricts the data for weekly view.
   const agg = await col
     .aggregate([
       {
         $match: {
-          year: { $ne: null },
-          month: { $ne: null },
+          invoiceDate: { $gte: actualFromDate, $lte: actualToDate },
           ...(groupBy === "customer" ? { partyName: { $ne: "" } } : {}),
-          $expr: {
-            $and: [
-              { $gte: [{ $add: [{ $multiply: ["$year", 100] }, "$month"] }, fromYM] },
-              { $lte: [{ $add: [{ $multiply: ["$year", 100] }, "$month"] }, toYM] },
-            ],
-          },
+        },
+      },
+      {
+        $addFields: {
+          isoWeek: { $isoWeek: "$invoiceDate" },
+          isoWeekYear: { $isoWeekYear: "$invoiceDate" },
         },
       },
       {
@@ -191,6 +275,8 @@ export async function buildPeriodTrend(
             groupKey: groupKeyExpr,
             year: "$year",
             month: "$month",
+            isoWeek: "$isoWeek",
+            isoWeekYear: "$isoWeekYear",
             chargeName: "$chargeName",
             chargeCategory: "$chargeRevenueCategory",
             invoiceCategory: "$revenueCategory",
@@ -228,7 +314,10 @@ export async function buildPeriodTrend(
     const id = row._id;
     const headBucket = bucketFor(id.chargeCategory, id.invoiceCategory);
     if (!headBucket) continue;
-    const mk = periodKey(view, id.year, id.month);
+    const mk =
+      view === "weekly"
+        ? `${id.isoWeekYear}-W${String(id.isoWeek).padStart(2, "0")}`
+        : periodKey(view, id.year, id.month);
     if (!periodKeySet.has(mk)) continue;
     const key = (id.groupKey as string) || "—";
     if (!byGroup.has(key)) byGroup.set(key, newGroup());
@@ -320,7 +409,7 @@ export function monthRangeLabel(months: { label: string }[]): { from: string; to
   return { from: months[0].label, to: months[months.length - 1].label };
 }
 
-/** Convert ViewMode + dates to URL-safe params */
+/** Convert URL params → ViewMode + dates */
 export function parseViewParams(sp: {
   view?: string;
   from?: string;
@@ -330,24 +419,31 @@ export function parseViewParams(sp: {
   let view: ViewMode = "monthly";
   if (v === "quarterly") view = "quarterly";
   else if (v === "yearly") view = "yearly";
-  // "custom" also stays as "monthly" grouping with explicit date range
-
-  // Normalise "YYYY-MM" → "YYYY-MM-01" so Date() parses reliably
-  const normalise = (s: string) =>
-    /^\d{4}-\d{2}$/.test(s.trim()) ? s.trim() + "-01" : s.trim();
+  else if (v === "weekly") view = "weekly";
+  // "custom" → "monthly" grouping with explicit date range
 
   let fromDate: Date | null = null;
   let toDate: Date | null = null;
 
   if (sp.from) {
-    const d = new Date(normalise(sp.from));
-    if (!isNaN(d.getTime())) fromDate = d;
+    const raw = sp.from.trim();
+    // Accept "YYYY-MM" (round to 1st) or "YYYY-MM-DD" (exact)
+    const isMonthOnly = /^\d{4}-\d{2}$/.test(raw);
+    const d = new Date(isMonthOnly ? raw + "-01" : raw);
+    if (!isNaN(d.getTime())) {
+      d.setUTCHours(0, 0, 0, 0);
+      fromDate = d;
+    }
   }
   if (sp.to) {
-    const d = new Date(normalise(sp.to));
+    const raw = sp.to.trim();
+    const isMonthOnly = /^\d{4}-\d{2}$/.test(raw);
+    const d = new Date(isMonthOnly ? raw + "-01" : raw);
     if (!isNaN(d.getTime())) {
-      // Move to last day of the chosen month so the whole month is included
-      d.setUTCMonth(d.getUTCMonth() + 1, 0);
+      if (isMonthOnly) {
+        // Round up to last day of month
+        d.setUTCMonth(d.getUTCMonth() + 1, 0);
+      }
       d.setUTCHours(23, 59, 59, 999);
       toDate = d;
     }

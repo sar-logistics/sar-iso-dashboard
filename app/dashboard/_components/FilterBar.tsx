@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Calendar, ChevronDown, Filter, ArrowUpDown } from "lucide-react";
 
 interface Props {
-  currentView: "monthly" | "quarterly" | "yearly";
+  currentView: "monthly" | "weekly" | "quarterly" | "yearly" | "custom";
   currentFrom: string;
   currentTo: string;
   fromLabel: string;
@@ -15,7 +15,7 @@ interface Props {
 
 const VIEW_OPTIONS = [
   { value: "monthly", label: "Monthly View", disabled: false, badge: null },
-  { value: "weekly", label: "Weekly View", disabled: true, badge: "Soon" },
+  { value: "weekly", label: "Last 5 Weeks", disabled: false, badge: null },
   { value: "quarterly", label: "Quarterly View", disabled: false, badge: null },
   { value: "yearly", label: "Yearly View", disabled: false, badge: null },
   { value: "custom", label: "Custom Range", disabled: false, badge: null },
@@ -93,7 +93,7 @@ export function FilterBar({
         </span>
         {isCustom ? (
           <input
-            type="month"
+            type="date"
             value={currentFrom}
             onChange={(e) => handleDateChange("from", e.target.value)}
             className="bg-surface-muted px-2.5 py-1.5 rounded-md text-ink-primary border border-surface-border focus:ring-2 focus:ring-info focus:outline-none text-xs"
@@ -112,7 +112,7 @@ export function FilterBar({
         </span>
         {isCustom ? (
           <input
-            type="month"
+            type="date"
             value={currentTo}
             onChange={(e) => handleDateChange("to", e.target.value)}
             className="bg-surface-muted px-2.5 py-1.5 rounded-md text-ink-primary border border-surface-border focus:ring-2 focus:ring-info focus:outline-none text-xs"

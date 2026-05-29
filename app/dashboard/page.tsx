@@ -5,37 +5,20 @@ import { buildPeriodTrend, monthRangeLabel, parseViewParams } from "@/lib/trend"
 import { DashboardTabs } from "./_components/DashboardTabs";
 import SyncButton from "./SyncButton";
 
-async function loadKpis(fromYM: number | null, toYM: number | null) {
+async function loadKpis(fromDate: Date | null, toDate: Date | null) {
   const db = await getDb();
   const col = db.collection("salesRegister");
 
-  // Year-month integer filter — more reliable than Date comparisons
-  const ymFilter =
-    fromYM && toYM
-      ? {
-          $expr: {
-            $and: [
-              {
-                $gte: [
-                  { $add: [{ $multiply: ["$year", 100] }, "$month"] },
-                  fromYM,
-                ],
-              },
-              {
-                $lte: [
-                  { $add: [{ $multiply: ["$year", 100] }, "$month"] },
-                  toYM,
-                ],
-              },
-            ],
-          },
-        }
+  // Use actual invoiceDate range — works for day-level (custom) and month-level
+  const dateFilter =
+    fromDate && toDate
+      ? { invoiceDate: { $gte: fromDate, $lte: toDate } }
       : {};
 
   const [totalAgg, catAgg, creditAgg, lastSyncArr] = await Promise.all([
     col
       .aggregate([
-        { $match: ymFilter },
+        { $match: dateFilter },
         {
           $group: {
             _id: null,
@@ -47,7 +30,7 @@ async function loadKpis(fromYM: number | null, toYM: number | null) {
       .toArray(),
     col
       .aggregate([
-        { $match: { revenueCategory: { $ne: "Credit Note" }, ...ymFilter } },
+        { $match: { revenueCategory: { $ne: "Credit Note" }, ...dateFilter } },
         {
           $group: {
             _id: "$chargeRevenueCategory",
@@ -58,7 +41,7 @@ async function loadKpis(fromYM: number | null, toYM: number | null) {
       .toArray(),
     col
       .aggregate([
-        { $match: { revenueCategory: "Credit Note", ...ymFilter } },
+        { $match: { revenueCategory: "Credit Note", ...dateFilter } },
         { $group: { _id: null, total: { $sum: "$amountInChargeCurrency" } } },
       ])
       .toArray(),
@@ -93,15 +76,8 @@ export default async function DashboardHome({
 }) {
   const { view, fromDate, toDate } = parseViewParams(searchParams);
 
-  const fromYM = fromDate
-    ? fromDate.getUTCFullYear() * 100 + (fromDate.getUTCMonth() + 1)
-    : null;
-  const toYM = toDate
-    ? toDate.getUTCFullYear() * 100 + (toDate.getUTCMonth() + 1)
-    : null;
-
   const [k, customerTrend, tradeLaneTrend] = await Promise.all([
-    loadKpis(fromYM, toYM),
+    loadKpis(fromDate, toDate),
     buildPeriodTrend("customer", { view, fromDate, toDate, topN: 10 }),
     buildPeriodTrend("tradeLane", { view, fromDate, toDate, topN: 10 }),
   ]);
