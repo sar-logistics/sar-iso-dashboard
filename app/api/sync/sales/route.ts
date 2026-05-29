@@ -2,17 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { getDb } from "@/lib/mongodb";
 import { readSheet } from "@/lib/google-sheets";
-import { mapRevenueCategory, mapRevenueHead, isTotalsRow } from "@/lib/mappings";
+import { mapRevenueCategory, isTotalsRow } from "@/lib/mappings";
 import { parseSheetDate, toNumber } from "@/lib/utils";
-import type { SalesRow, SyncLog } from "@/types";
+import type { SyncLog } from "@/types";
 
-const SHEET_NAME = "Sales Register";
-const HEADER_ROW_INDEX = 1; // row 2 in sheet (zero-indexed)
+const SALES_SHEET = "Sales Register";
+const MAPPING_SHEET = "Charge to Revenue Type Mapping";
+const SALES_HEADER_ROW = 1; // 0-indexed; data starts at row 2
 
-/**
- * Sync Sales Register sheet to MongoDB.
- * Auth: either user session OR cron secret in header.
- */
 async function authorize(req: NextRequest): Promise<boolean> {
   const cronHeader = req.headers.get("authorization");
   if (cronHeader === `Bearer ${process.env.CRON_SECRET}`) return true;
@@ -20,24 +17,55 @@ async function authorize(req: NextRequest): Promise<boolean> {
   return !!session?.user?.email;
 }
 
-export async function POST(req: NextRequest) {
-  return handleSync(req);
-}
+export async function POST(req: NextRequest) { return handleSync(req); }
+export async function GET(req: NextRequest) { return handleSync(req); }
 
-export async function GET(req: NextRequest) {
-  // Allow GET for Vercel Cron (sends bearer token)
-  return handleSync(req);
+/**
+ * Build the Charge Name → Revenue Category map by reading the
+ * "Charge to Revenue Type Mapping" sheet and upserting into chargeMappings.
+ */
+async function syncChargeMappings(): Promise<Map<string, string>> {
+  const rows = await readSheet(MAPPING_SHEET);
+  if (rows.length < 2) throw new Error("Charge mapping sheet is empty");
+
+  const headers = rows[0].map((h: any) => String(h || "").trim().toLowerCase());
+  const chargeIdx = headers.findIndex((h: string) => h.includes("charge name"));
+  const catIdx = headers.findIndex(
+    (h: string) => h.includes("revenue category") || h.includes("category")
+  );
+  if (chargeIdx < 0 || catIdx < 0) {
+    throw new Error(
+      `Mapping sheet missing 'Charge Name' or 'Revenue Category' column`
+    );
+  }
+
+  const map = new Map<string, string>();
+  const docs: any[] = [];
+  for (let r = 1; r < rows.length; r++) {
+    const row = rows[r] || [];
+    const charge = String(row[chargeIdx] || "").trim();
+    const cat = String(row[catIdx] || "").trim();
+    if (!charge || !cat) continue;
+    map.set(charge.toUpperCase(), cat);
+    docs.push({ chargeName: charge, revenueCategory: cat, syncedAt: new Date() });
+  }
+
+  const db = await getDb();
+  await db.collection("chargeMappings").deleteMany({});
+  if (docs.length) await db.collection("chargeMappings").insertMany(docs);
+  await db.collection("chargeMappings").createIndex({ chargeName: 1 });
+
+  return map;
 }
 
 async function handleSync(req: NextRequest) {
   const t0 = Date.now();
-
   if (!(await authorize(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const log: SyncLog = {
-    sheetName: SHEET_NAME,
+    sheetName: SALES_SHEET,
     syncedAt: new Date(),
     rowsRead: 0,
     rowsInserted: 0,
@@ -45,23 +73,25 @@ async function handleSync(req: NextRequest) {
     durationMs: 0,
   };
 
+  let mappingsCount = 0;
+
   try {
-    const rows = await readSheet(SHEET_NAME);
-    log.rowsRead = Math.max(0, rows.length - (HEADER_ROW_INDEX + 1));
+    // Step 0: sync charge mappings sheet
+    const chargeMap = await syncChargeMappings();
+    mappingsCount = chargeMap.size;
 
-    if (rows.length <= HEADER_ROW_INDEX + 1) {
-      throw new Error("No data rows found");
-    }
+    // Step 1: read sales register
+    const rows = await readSheet(SALES_SHEET);
+    log.rowsRead = Math.max(0, rows.length - (SALES_HEADER_ROW + 1));
+    if (rows.length <= SALES_HEADER_ROW + 1) throw new Error("No data rows in Sales Register");
 
-    const headers = rows[HEADER_ROW_INDEX].map((h) =>
-      String(h || "").trim()
-    );
+    const headers = rows[SALES_HEADER_ROW].map((h: any) => String(h || "").trim());
     const idx = (label: string) => headers.indexOf(label);
 
     const cols = {
       invoiceType: idx("Invoice Type"),
       invoiceNo: idx("Invoice No"),
-      invoiceDate: idx("Invoice Data"), // sheet has typo "Data"
+      invoiceDate: idx("Invoice Data"),
       partyName: idx("Party Name"),
       gstinNo: idx("GSTIN NO"),
       shipperName: idx("Shipper Name"),
@@ -79,19 +109,28 @@ async function handleSync(req: NextRequest) {
       amountInChargeCurrency: idx("Amount in Charge Currency"),
       invoiceCurrency: idx("Invoice Currency"),
       amountInInvoiceCurrency: idx("Amount in Invoice Currency"),
-      invoiceExchRate: idx("Invoice Exchage Rate"), // sheet has typo "Exchage"
+      invoiceExchRate: idx("Invoice Exchage Rate"),
       amountInLocalCurrency: idx("Amount in Local Currency"),
     };
 
-    const docs: SalesRow[] = [];
-    for (let r = HEADER_ROW_INDEX + 1; r < rows.length; r++) {
+    const docs: any[] = [];
+    const unmappedSet = new Set<string>();
+
+    for (let r = SALES_HEADER_ROW + 1; r < rows.length; r++) {
       const row = rows[r] || [];
       if (isTotalsRow(row[cols.invoiceType])) continue;
-      if (!row[cols.invoiceNo]) continue; // skip empty rows
+      if (!row[cols.invoiceNo]) continue;
 
       const invoiceType = String(row[cols.invoiceType] || "").trim();
       const chargeName = String(row[cols.chargeName] || "").trim();
       const invoiceDate = parseSheetDate(row[cols.invoiceDate]);
+
+      // Charge → Revenue Category lookup from mapping sheet
+      const chargeRevenueCategory =
+        chargeMap.get(chargeName.toUpperCase()) || "Unmapped";
+      if (chargeRevenueCategory === "Unmapped" && chargeName) {
+        unmappedSet.add(chargeName);
+      }
 
       docs.push({
         invoiceType,
@@ -117,7 +156,7 @@ async function handleSync(req: NextRequest) {
         invoiceExchRate: toNumber(row[cols.invoiceExchRate]),
         amountInLocalCurrency: toNumber(row[cols.amountInLocalCurrency]),
         revenueCategory: mapRevenueCategory(invoiceType),
-        revenueHead: mapRevenueHead(chargeName),
+        chargeRevenueCategory,
         year: invoiceDate ? invoiceDate.getUTCFullYear() : null,
         month: invoiceDate ? invoiceDate.getUTCMonth() + 1 : null,
         syncedAt: new Date(),
@@ -125,18 +164,20 @@ async function handleSync(req: NextRequest) {
     }
 
     const db = await getDb();
-    // Full replace strategy: simpler and safe for hourly sync
     await db.collection("salesRegister").deleteMany({});
     if (docs.length) await db.collection("salesRegister").insertMany(docs);
 
-    // Helpful indexes
     await db.collection("salesRegister").createIndex({ invoiceDate: -1 });
     await db.collection("salesRegister").createIndex({ partyName: 1 });
     await db.collection("salesRegister").createIndex({ revenueCategory: 1 });
-    await db.collection("salesRegister").createIndex({ revenueHead: 1 });
+    await db.collection("salesRegister").createIndex({ chargeRevenueCategory: 1 });
     await db.collection("salesRegister").createIndex({ year: 1, month: 1 });
 
     log.rowsInserted = docs.length;
+    (log as any).mappingsLoaded = mappingsCount;
+    if (unmappedSet.size > 0) {
+      (log as any).unmappedCharges = [...unmappedSet];
+    }
   } catch (err: any) {
     log.status = "error";
     log.errorMsg = err?.message || String(err);
@@ -145,9 +186,7 @@ async function handleSync(req: NextRequest) {
     try {
       const db = await getDb();
       await db.collection("syncLogs").insertOne(log);
-    } catch {
-      /* swallow */
-    }
+    } catch {}
   }
 
   return NextResponse.json(log, { status: log.status === "success" ? 200 : 500 });

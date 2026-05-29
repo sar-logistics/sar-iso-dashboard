@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { ChevronRight, ChevronDown } from "lucide-react";
 import { titleCase } from "@/lib/utils";
 import { CustomerAvatar } from "./CustomerAvatar";
 import { DrillDownModal, DrillContext } from "./DrillDownModal";
@@ -11,7 +12,7 @@ export interface MonthlyTrendData {
 }
 
 export interface GroupBlock {
-  group: string; // customer name OR "POL → POD"
+  group: string;
   total: number;
   metrics: MetricRow[];
 }
@@ -21,13 +22,12 @@ export interface MetricRow {
   total: number;
   monthly: Record<string, number>;
   level: "primary" | "subtotal" | "detail";
-  bucket?: "Detention" | "Export" | "M&R";
+  bucket?: string;
   chargeName?: string;
 }
 
 interface Props {
   data: MonthlyTrendData;
-  /** "customer" or "tradeLane" — affects how group labels & avatars render */
   groupBy: "customer" | "tradeLane";
   title: string;
 }
@@ -48,6 +48,43 @@ function cellClass(n: number): string {
 export function MonthlyTrendTable({ data, groupBy, title }: Props) {
   const { months, rows, grandTotal } = data;
   const [drill, setDrill] = useState<DrillContext | null>(null);
+
+  // Track expanded customer blocks (default: all expanded)
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  // Track expanded subtotal-buckets (default: all collapsed — only show subtotals)
+  const [expandedBuckets, setExpandedBuckets] = useState<Set<string>>(new Set());
+
+  const toggleGroup = (g: string) => {
+    setCollapsedGroups((p) => {
+      const n = new Set(p);
+      n.has(g) ? n.delete(g) : n.add(g);
+      return n;
+    });
+  };
+  const toggleBucket = (g: string, b: string) => {
+    const key = `${g}|${b}`;
+    setExpandedBuckets((p) => {
+      const n = new Set(p);
+      n.has(key) ? n.delete(key) : n.add(key);
+      return n;
+    });
+  };
+  const expandAll = () => {
+    setCollapsedGroups(new Set());
+    const all = new Set<string>();
+    [grandTotal, ...rows].forEach((blk) => {
+      blk.metrics.forEach((m) => {
+        if (m.level === "subtotal" && m.bucket) all.add(`${blk.group}|${m.bucket}`);
+      });
+    });
+    setExpandedBuckets(all);
+  };
+  const collapseAll = () => {
+    const all = new Set<string>();
+    [grandTotal, ...rows].forEach((blk) => all.add(blk.group));
+    setCollapsedGroups(all);
+    setExpandedBuckets(new Set());
+  };
 
   const openDrill = (
     group: string,
@@ -81,7 +118,7 @@ export function MonthlyTrendTable({ data, groupBy, title }: Props) {
       month: mo.month,
       monthLabel: mo.label,
       head: metric.label,
-      bucket: metric.bucket || null,
+      bucket: (metric.bucket as any) || null,
       chargeName: metric.chargeName || null,
       level: metric.level,
       cellTotal: metric.monthly[mo.key] || 0,
@@ -91,12 +128,27 @@ export function MonthlyTrendTable({ data, groupBy, title }: Props) {
   return (
     <>
       <div className="card overflow-hidden">
-        <div className="px-4 py-3 border-b border-surface-border flex items-center justify-between">
+        <div className="px-4 py-3 border-b border-surface-border flex items-center justify-between flex-wrap gap-3">
           <div className="text-[11px] uppercase tracking-wider text-ink-tertiary">
             {title}
           </div>
-          <div className="text-[11px] text-ink-tertiary">
-            Click any number for details · Monthly · USD
+          <div className="flex items-center gap-3">
+            <button
+              onClick={expandAll}
+              className="text-[11px] text-info-text hover:underline"
+            >
+              Expand all
+            </button>
+            <span className="text-ink-tertiary text-[11px]">·</span>
+            <button
+              onClick={collapseAll}
+              className="text-[11px] text-info-text hover:underline"
+            >
+              Collapse all
+            </button>
+            <span className="text-[11px] text-ink-tertiary">
+              Click any number for details · Monthly · USD
+            </span>
           </div>
         </div>
 
@@ -104,7 +156,7 @@ export function MonthlyTrendTable({ data, groupBy, title }: Props) {
           <table className="trend-table">
             <thead>
               <tr>
-                <th className="left min-w-[200px]">
+                <th className="left min-w-[220px]">
                   {groupBy === "customer" ? "Customer" : "Trade Lane (POL → POD)"}
                 </th>
                 <th className="left min-w-[180px]">Metric / Charge Name</th>
@@ -121,6 +173,10 @@ export function MonthlyTrendTable({ data, groupBy, title }: Props) {
                 months={months}
                 isGrand
                 groupBy={groupBy}
+                collapsed={collapsedGroups.has(grandTotal.group)}
+                expandedBuckets={expandedBuckets}
+                onToggleGroup={() => toggleGroup(grandTotal.group)}
+                onToggleBucket={(b) => toggleBucket(grandTotal.group, b)}
                 onDrill={(m, mo) => openDrill(grandTotal.group, true, m, mo)}
               />
               {rows.map((block) => (
@@ -129,6 +185,10 @@ export function MonthlyTrendTable({ data, groupBy, title }: Props) {
                   block={block}
                   months={months}
                   groupBy={groupBy}
+                  collapsed={collapsedGroups.has(block.group)}
+                  expandedBuckets={expandedBuckets}
+                  onToggleGroup={() => toggleGroup(block.group)}
+                  onToggleBucket={(b) => toggleBucket(block.group, b)}
                   onDrill={(m, mo) => openDrill(block.group, false, m, mo)}
                 />
               ))}
@@ -154,36 +214,64 @@ function BlockRows({
   months,
   isGrand = false,
   groupBy,
+  collapsed,
+  expandedBuckets,
+  onToggleGroup,
+  onToggleBucket,
   onDrill,
 }: {
   block: GroupBlock;
   months: { key: string; label: string; year: number; month: number }[];
   isGrand?: boolean;
   groupBy: "customer" | "tradeLane";
+  collapsed: boolean;
+  expandedBuckets: Set<string>;
+  onToggleGroup: () => void;
+  onToggleBucket: (bucket: string) => void;
   onDrill: (m: MetricRow, mo: typeof months[number]) => void;
 }) {
-  const metrics = block.metrics;
-  const groupLabel =
-    isGrand
-      ? block.group
-      : groupBy === "customer"
-      ? titleCase(block.group)
-      : block.group; // trade lane displayed as-is
+  const groupLabel = isGrand
+    ? block.group
+    : groupBy === "customer"
+    ? titleCase(block.group)
+    : block.group;
 
-  const avatarSource =
-    isGrand ? "TT" : groupBy === "customer" ? block.group : block.group.replace(" → ", " ");
+  const avatarSource = isGrand
+    ? "TT"
+    : groupBy === "customer"
+    ? block.group
+    : block.group.replace(" → ", " ");
+
+  // Filter metrics by collapse/expand state
+  let visibleMetrics: MetricRow[];
+  if (collapsed) {
+    // Show only the primary "Revenue" row
+    visibleMetrics = block.metrics.filter((m) => m.level === "primary");
+  } else {
+    // Show all subtotals + details (only if their bucket is expanded)
+    visibleMetrics = block.metrics.filter((m) => {
+      if (m.level === "primary" || m.level === "subtotal") return true;
+      if (m.level === "detail") {
+        return expandedBuckets.has(`${block.group}|${m.bucket}`);
+      }
+      return false;
+    });
+  }
 
   return (
     <>
-      {metrics.map((m, i) => {
+      {visibleMetrics.map((m, i) => {
         const rowClass =
           m.level === "primary"
-            ? isGrand ? "total-row" : "subtotal-row"
+            ? isGrand
+              ? "total-row"
+              : "subtotal-row"
             : m.level === "subtotal"
             ? "bucket-row"
             : "detail-row";
 
-        const labelIndent = m.level === "detail" ? "pl-6" : m.level === "subtotal" ? "pl-2" : "";
+        const labelIndent =
+          m.level === "detail" ? "pl-6" : m.level === "subtotal" ? "pl-2" : "";
         const labelStyle =
           m.level === "primary"
             ? "font-semibold"
@@ -191,11 +279,27 @@ function BlockRows({
             ? "font-medium text-ink-secondary"
             : "italic text-ink-tertiary text-[12px]";
 
+        // Decide if subtotal row should show expand chevron (has details available)
+        const subtotalKey = m.bucket ? `${block.group}|${m.bucket}` : "";
+        const isBucketExpanded = m.bucket && expandedBuckets.has(subtotalKey);
+        const hasDetails =
+          m.level === "subtotal" &&
+          block.metrics.some(
+            (x) => x.level === "detail" && x.bucket === m.bucket
+          );
+
         return (
           <tr key={`${m.label}-${i}`} className={rowClass}>
             {i === 0 ? (
-              <td className="left align-top" rowSpan={metrics.length}>
-                <div className="flex items-center gap-2 pt-1">
+              <td className="left align-top" rowSpan={visibleMetrics.length}>
+                <div className="flex items-center gap-1.5 pt-1">
+                  <button
+                    onClick={onToggleGroup}
+                    className="p-0.5 hover:bg-surface-muted rounded text-ink-tertiary hover:text-ink-primary transition"
+                    title={collapsed ? "Expand" : "Collapse"}
+                  >
+                    {collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+                  </button>
                   <CustomerAvatar name={avatarSource} />
                   <span className={isGrand ? "font-semibold" : "font-medium"}>
                     {groupLabel}
@@ -204,7 +308,16 @@ function BlockRows({
               </td>
             ) : null}
             <td className={`left ${labelIndent}`}>
-              <span className={labelStyle}>
+              <span className={`inline-flex items-center gap-1 ${labelStyle}`}>
+                {hasDetails && m.bucket && (
+                  <button
+                    onClick={() => onToggleBucket(m.bucket!)}
+                    className="text-ink-tertiary hover:text-ink-primary p-0"
+                    title={isBucketExpanded ? "Hide charges" : "Show charges"}
+                  >
+                    {isBucketExpanded ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                  </button>
+                )}
                 {m.level === "detail" ? `↳ ${titleCase(m.label)}` : m.label}
               </span>
             </td>

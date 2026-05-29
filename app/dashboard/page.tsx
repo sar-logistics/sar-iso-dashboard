@@ -8,34 +8,38 @@ async function loadKpis() {
   const db = await getDb();
   const col = db.collection("salesRegister");
 
-  const agg = await col
+  // Total across everything (including credit notes)
+  const totalAgg = await col
     .aggregate([
+      { $group: { _id: null, total: { $sum: "$amountInChargeCurrency" }, count: { $sum: 1 } } },
+    ])
+    .toArray();
+  const totalRevenue = totalAgg[0]?.total || 0;
+  const totalRows = totalAgg[0]?.count || 0;
+
+  // By Charge Revenue Category (excluding credit notes)
+  const catAgg = await col
+    .aggregate([
+      { $match: { revenueCategory: { $ne: "Credit Note" } } },
       {
         $group: {
-          _id: "$revenueCategory",
+          _id: "$chargeRevenueCategory",
           total: { $sum: "$amountInChargeCurrency" },
-          count: { $sum: 1 },
         },
       },
     ])
     .toArray();
+  const byCharge: Record<string, number> = {};
+  for (const r of catAgg) byCharge[r._id || "Unmapped"] = r.total || 0;
 
-  const byCat: Record<string, number> = {};
-  let totalRevenue = 0;
-  let totalRows = 0;
-  for (const r of agg) {
-    byCat[r._id || "Unknown"] = r.total || 0;
-    totalRevenue += r.total || 0;
-    totalRows += r.count || 0;
-  }
-
-  const headAgg = await col
+  // Credit notes (separate)
+  const creditAgg = await col
     .aggregate([
-      { $group: { _id: "$revenueHead", total: { $sum: "$amountInChargeCurrency" } } },
+      { $match: { revenueCategory: "Credit Note" } },
+      { $group: { _id: null, total: { $sum: "$amountInChargeCurrency" } } },
     ])
     .toArray();
-  const byHead: Record<string, number> = {};
-  for (const r of headAgg) byHead[r._id || "Other"] = r.total || 0;
+  const creditNotes = creditAgg[0]?.total || 0;
 
   const lastSync = await db
     .collection("syncLogs")
@@ -46,13 +50,13 @@ async function loadKpis() {
 
   return {
     totalRevenue,
-    principal: byCat["Principal Revenue"] || 0,
-    subLease: byCat["Sub-Lease Revenue"] || 0,
-    mrRevenue: byCat["M&R Revenue"] || 0,
-    creditNotes: byCat["Credit Note"] || 0,
-    detention: byHead["Detention"] || 0,
-    exportRev: byHead["Export"] || 0,
     totalRows,
+    lease: byCharge["Lease"] || 0,
+    detention: byCharge["Detention"] || 0,
+    exim: byCharge["EXIM"] || 0,
+    mr: byCharge["M&R"] || 0,
+    unmapped: byCharge["Unmapped"] || 0,
+    creditNotes,
     lastSync: lastSync[0] || null,
   };
 }
@@ -64,17 +68,6 @@ export default async function DashboardHome() {
     buildMonthlyTrend("tradeLane", 10),
   ]);
   const range = monthRangeLabel(customerTrend.months);
-
-  const kpisForClient = {
-    totalRevenue: k.totalRevenue,
-    principal: k.principal,
-    subLease: k.subLease,
-    mrRevenue: k.mrRevenue,
-    creditNotes: k.creditNotes,
-    detention: k.detention,
-    exportRev: k.exportRev,
-    totalRows: k.totalRows,
-  };
 
   return (
     <div className="p-6 max-w-[1600px] mx-auto">
@@ -96,24 +89,26 @@ export default async function DashboardHome() {
       />
 
       <DashboardTabs
-        kpis={kpisForClient}
+        kpis={{
+          totalRevenue: k.totalRevenue,
+          totalRows: k.totalRows,
+          lease: k.lease,
+          detention: k.detention,
+          exim: k.exim,
+          mr: k.mr,
+          unmapped: k.unmapped,
+          creditNotes: k.creditNotes,
+        }}
         customerTrend={customerTrend}
         tradeLaneTrend={tradeLaneTrend}
       />
 
-      {k.creditNotes !== 0 && (
-        <div className="mt-4 text-xs text-ink-tertiary">
-          Note: Credit Notes of {fmtSign(k.creditNotes)} are excluded from
-          charts and trend tables but included in Total Revenue.
+      {k.unmapped > 0 && (
+        <div className="mt-4 text-xs text-warning-text bg-warning/40 rounded-md px-3 py-2 inline-block">
+          ⚠️ ${(k.unmapped / 1000).toFixed(1)}K of charges are not mapped in your
+          &ldquo;Charge to Revenue Type Mapping&rdquo; sheet. Add them there and click Sync Now.
         </div>
       )}
     </div>
   );
-}
-
-function fmtSign(n: number): string {
-  const abs = Math.abs(n);
-  const sign = n < 0 ? "-" : "+";
-  if (abs >= 1000) return `${sign}$${(abs / 1000).toFixed(1)}K`;
-  return `${sign}$${abs.toFixed(0)}`;
 }

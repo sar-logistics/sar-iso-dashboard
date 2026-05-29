@@ -11,13 +11,13 @@ import {
 
 interface Kpis {
   totalRevenue: number;
-  principal: number;
-  subLease: number;
-  mrRevenue: number;
-  creditNotes: number;
-  detention: number;
-  exportRev: number;
   totalRows: number;
+  lease: number;
+  detention: number;
+  exim: number;
+  mr: number;
+  unmapped: number;
+  creditNotes: number;
 }
 
 interface Props {
@@ -37,7 +37,6 @@ type TabId = (typeof TABS)[number]["id"];
 export function DashboardTabs({ kpis, customerTrend, tradeLaneTrend }: Props) {
   const [tab, setTab] = useState<TabId>("overview");
 
-  // Derive chart data
   const topCustomers = customerTrend.rows.slice(0, 10).map((r) => ({
     name: titleCase(r.group),
     value: r.total,
@@ -49,22 +48,17 @@ export function DashboardTabs({ kpis, customerTrend, tradeLaneTrend }: Props) {
   }));
 
   const revenueMix = [
-    { name: "Principal", value: kpis.principal },
-    { name: "Sub-Lease", value: kpis.subLease },
+    { name: "Lease", value: kpis.lease },
     { name: "Detention", value: kpis.detention },
-    { name: "Export", value: kpis.exportRev },
-    { name: "M&R", value: kpis.mrRevenue },
+    { name: "EXIM", value: kpis.exim },
+    { name: "M&R", value: kpis.mr },
+    ...(kpis.unmapped > 0 ? [{ name: "Unmapped", value: kpis.unmapped }] : []),
   ].filter((d) => d.value > 0);
 
-  // Monthly revenue trend: sum primary + bucket subtotals per month (no detail rows = no double count)
+  // Monthly trend = sum of grand-total primary row across months
   const monthlyTrend = customerTrend.months.map((m) => {
-    const value = customerTrend.grandTotal.metrics.reduce((sum, metric) => {
-      if (metric.level === "primary" || metric.level === "subtotal") {
-        return sum + (metric.monthly[m.key] || 0);
-      }
-      return sum;
-    }, 0);
-    return { month: m.label, value };
+    const primary = customerTrend.grandTotal.metrics.find((x) => x.level === "primary");
+    return { month: m.label, value: primary?.monthly[m.key] || 0 };
   });
 
   return (
@@ -95,34 +89,34 @@ export function DashboardTabs({ kpis, customerTrend, tradeLaneTrend }: Props) {
               accent="bg-accent-green"
             />
             <KPICard
-              label="Principal Revenue"
-              value={kpis.principal}
-              subtitle="Owner-side lease & freight"
+              label="Lease Revenue"
+              value={kpis.lease}
+              subtitle="Lease Rent Charges"
               accent="bg-accent-blue"
-            />
-            <KPICard
-              label="Sub-Lease Revenue"
-              value={kpis.subLease}
-              subtitle="Sub-leased tank income"
-              accent="bg-accent-purple"
             />
             <KPICard
               label="Detention Revenue"
               value={kpis.detention}
-              subtitle="POD + Loading detention"
+              subtitle="Detention, DEM-IMP, DEM-EXP"
               accent="bg-accent-orange"
             />
             <KPICard
-              label="Export Revenue"
-              value={kpis.exportRev}
-              subtitle="Ocean freight charges"
+              label="EXIM Revenue"
+              value={kpis.exim}
+              subtitle="Freight, handling, docs, customs"
               accent="bg-accent-yellow"
             />
             <KPICard
               label="M&R Revenue"
-              value={kpis.mrRevenue}
-              subtitle="Repair & cleaning recovery"
+              value={kpis.mr}
+              subtitle="Repair, cleaning, storage"
               accent="bg-accent-pink"
+            />
+            <KPICard
+              label="Credit Notes"
+              value={kpis.creditNotes}
+              subtitle="Net of all credits"
+              accent="bg-accent-purple"
             />
           </div>
 
@@ -136,7 +130,7 @@ export function DashboardTabs({ kpis, customerTrend, tradeLaneTrend }: Props) {
             <DonutChart
               data={revenueMix}
               title="Revenue Mix"
-              subtitle="Distribution by category"
+              subtitle="Distribution by charge category"
             />
           </div>
 
@@ -150,7 +144,7 @@ export function DashboardTabs({ kpis, customerTrend, tradeLaneTrend }: Props) {
             <MonthlyTrendLine
               data={monthlyTrend}
               title="Monthly Revenue Trend"
-              subtitle="Total revenue per month"
+              subtitle="Total revenue per month (excl. credit notes)"
               color="#A855F7"
             />
           </div>

@@ -32,17 +32,14 @@ export async function GET(req: NextRequest) {
   if (pol) filter.pol = pol;
   if (pod) filter.pod = pod;
 
-  // Apply head/bucket/charge filtering matching the row that was clicked
+  // Apply head/bucket/charge filtering using chargeRevenueCategory
   if (level === "detail" && chargeName) {
     filter.chargeName = chargeName;
-    if (bucket) filter.revenueHead = bucket;
+    if (bucket) filter.chargeRevenueCategory = bucket;
   } else if (level === "subtotal" && bucket) {
-    filter.revenueHead = bucket;
-  } else if (head === "Revenue") {
-    filter.revenueHead = { $in: ["Lease", "Other"] };
-  } else if (head === "Detention" || head === "Export" || head === "M&R") {
-    filter.revenueHead = head;
+    filter.chargeRevenueCategory = bucket;
   }
+  // level === "primary" (Revenue row): no chargeRevenueCategory filter — sum of all charges
 
   const db = await getDb();
   const rows = await db
@@ -54,6 +51,7 @@ export async function GET(req: NextRequest) {
         invoiceType: 1,
         partyName: 1,
         chargeName: 1,
+        chargeRevenueCategory: 1,
         pol: 1,
         pod: 1,
         qty: 1,
