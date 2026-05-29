@@ -12,6 +12,7 @@ export interface MonthlyTrendData {
 
 export interface GroupBlock {
   group: string; // customer name OR "POL → POD"
+  total: number;
   metrics: MetricRow[];
 }
 
