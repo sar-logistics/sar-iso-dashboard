@@ -99,7 +99,7 @@ export function MonthlyTrendTable({ data, groupBy, title }: Props) {
 
     if (groupBy === "customer") {
       customer = isGrand ? null : group;
-      groupLabel = isGrand ? "All Customers" : titleCase(group);
+      groupLabel = isGrand ? "All Agents" : titleCase(group);
     } else {
       if (!isGrand) {
         const [p, q] = group.split(" → ");
@@ -157,7 +157,7 @@ export function MonthlyTrendTable({ data, groupBy, title }: Props) {
             <thead>
               <tr>
                 <th className="left min-w-[220px]">
-                  {groupBy === "customer" ? "Customer" : "Trade Lane (POL → POD)"}
+                  {groupBy === "customer" ? "Agent" : "Trade Lane (POL → POD)"}
                 </th>
                 <th className="left min-w-[180px]">Metric / Charge Name</th>
                 <th className="min-w-[110px] bg-surface-subtle/80">Grand Total</th>

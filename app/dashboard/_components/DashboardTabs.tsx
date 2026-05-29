@@ -28,7 +28,7 @@ interface Props {
 
 const TABS = [
   { id: "overview", label: "Overview" },
-  { id: "customer", label: "Customer Detail" },
+  { id: "customer", label: "Agent Detail" },
   { id: "tradelane", label: "Trade Lane Detail" },
 ] as const;
 
@@ -137,8 +137,8 @@ export function DashboardTabs({ kpis, customerTrend, tradeLaneTrend }: Props) {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <HorizontalBarChart
               data={topCustomers}
-              title="Top Customers"
-              subtitle="Top 10 customers by total revenue"
+              title="Top Agents"
+              subtitle="Top 10 agents by total revenue"
               color="#22C55E"
             />
             <MonthlyTrendLine
@@ -155,7 +155,7 @@ export function DashboardTabs({ kpis, customerTrend, tradeLaneTrend }: Props) {
         <MonthlyTrendTable
           data={customerTrend}
           groupBy="customer"
-          title="Customer · Monthly Trend"
+          title="Agent · Monthly Trend"
         />
       )}
 

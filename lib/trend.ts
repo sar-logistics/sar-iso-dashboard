@@ -176,7 +176,7 @@ export async function buildPeriodTrend(
           months: [],
           rows: [],
           grandTotal: emptyGroup(
-            groupBy === "customer" ? "ALL CUSTOMERS" : "ALL TRADE LANES"
+            groupBy === "customer" ? "ALL AGENTS" : "ALL TRADE LANES"
           ),
         };
       }
@@ -217,7 +217,7 @@ export async function buildPeriodTrend(
         months: [],
         rows: [],
         grandTotal: emptyGroup(
-          groupBy === "customer" ? "ALL CUSTOMERS" : "ALL TRADE LANES"
+          groupBy === "customer" ? "ALL AGENTS" : "ALL TRADE LANES"
         ),
       };
     }
@@ -389,7 +389,7 @@ export async function buildPeriodTrend(
       metrics: toMetrics(byGroup.get(k)!),
     })),
     grandTotal: {
-      group: groupBy === "customer" ? "ALL CUSTOMERS" : "ALL TRADE LANES",
+      group: groupBy === "customer" ? "ALL AGENTS" : "ALL TRADE LANES",
       total: [...groupTotals.values()].reduce((a, b) => a + b, 0),
       metrics: toMetrics(grand),
     },

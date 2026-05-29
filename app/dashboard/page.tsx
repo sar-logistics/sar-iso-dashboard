@@ -92,7 +92,7 @@ export default async function DashboardHome({
             Sales Performance
           </h1>
           <p className="text-xs text-ink-tertiary mt-0.5">
-            ISO Tank · Charts and detailed breakdowns by customer and trade lane
+            ISO Tank · Charts and detailed breakdowns by agent and trade lane
           </p>
         </div>
         <SyncButton />

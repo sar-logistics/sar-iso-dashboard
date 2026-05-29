@@ -139,7 +139,7 @@ export function DrillDownModal({ ctx, onClose }: Props) {
                 <tr className="text-[11px] uppercase tracking-wider text-ink-tertiary">
                   <th className="px-3 py-2.5 text-left">Date</th>
                   <th className="px-3 py-2.5 text-left">Invoice No</th>
-                  {showCustomer && <th className="px-3 py-2.5 text-left">Customer</th>}
+                  {showCustomer && <th className="px-3 py-2.5 text-left">Agent</th>}
                   <th className="px-3 py-2.5 text-left">Charge Name</th>
                   {showPolPod && (
                     <th className="px-3 py-2.5 text-left">Trade Lane (POL → POD)</th>
