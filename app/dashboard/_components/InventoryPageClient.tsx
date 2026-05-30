@@ -149,11 +149,14 @@ export function InventoryPageClient({
           title="Tanks by Principal"
           subtitle="Top principals by current tank count"
           color="#22C55E"
+          valueFormatter={(n) => n.toLocaleString("en-IN")}
+          tooltipLabel="Tanks"
         />
         <DonutChart
           data={donutData}
           title="Tanks by Activity"
           subtitle="Current status distribution"
+          valueFormatter={(n) => n.toLocaleString("en-IN")}
         />
       </div>
 

@@ -13,6 +13,7 @@ import {
   Legend,
   LineChart,
   Line,
+  LabelList,
 } from "recharts";
 
 const ACCENT_COLORS = [
@@ -41,11 +42,15 @@ export function HorizontalBarChart({
   title,
   subtitle,
   color = "#3B82F6",
+  valueFormatter = fmtCompact,
+  tooltipLabel = "Revenue",
 }: {
   data: BarChartData[];
   title: string;
   subtitle?: string;
   color?: string;
+  valueFormatter?: (n: number) => string;
+  tooltipLabel?: string;
 }) {
   const display = data.map((d) => ({
     ...d,
@@ -67,7 +72,7 @@ export function HorizontalBarChart({
             <BarChart
               data={display}
               layout="vertical"
-              margin={{ top: 0, right: 30, bottom: 0, left: 5 }}
+              margin={{ top: 0, right: 60, bottom: 0, left: 5 }}
             >
               <CartesianGrid
                 strokeDasharray="3 3"
@@ -76,7 +81,7 @@ export function HorizontalBarChart({
               />
               <XAxis
                 type="number"
-                tickFormatter={fmtCompact}
+                tickFormatter={valueFormatter}
                 tick={{ fontSize: 10, fill: "#94A3B8" }}
                 axisLine={false}
                 tickLine={false}
@@ -90,7 +95,7 @@ export function HorizontalBarChart({
                 tickLine={false}
               />
               <Tooltip
-                formatter={(value: number) => [fmtCompact(value), "Revenue"]}
+                formatter={(value: number) => [valueFormatter(value), tooltipLabel]}
                 labelFormatter={(label, items: any[]) =>
                   items?.[0]?.payload?.fullName || label
                 }
@@ -100,7 +105,18 @@ export function HorizontalBarChart({
                   border: "1px solid #E2E8F0",
                 }}
               />
-              <Bar dataKey="value" fill={color} radius={[0, 4, 4, 0]} />
+              <Bar dataKey="value" fill={color} radius={[0, 4, 4, 0]}>
+                <LabelList
+                  dataKey="value"
+                  position="right"
+                  formatter={valueFormatter}
+                  style={{
+                    fontSize: 11,
+                    fill: "#1E293B",
+                    fontWeight: 500,
+                  }}
+                />
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         )}
@@ -113,10 +129,12 @@ export function DonutChart({
   data,
   title,
   subtitle,
+  valueFormatter = fmtCompact,
 }: {
   data: BarChartData[];
   title: string;
   subtitle?: string;
+  valueFormatter?: (n: number) => string;
 }) {
   const total = data.reduce((s, d) => s + d.value, 0);
 
@@ -142,9 +160,11 @@ export function DonutChart({
                 outerRadius="75%"
                 paddingAngle={2}
                 dataKey="value"
-                label={(entry: any) =>
-                  `${((entry.value / total) * 100).toFixed(0)}%`
-                }
+                label={(entry: any) => {
+                  const pct = (entry.value / total) * 100;
+                  if (pct < 3) return ""; // skip tiny slices
+                  return `${valueFormatter(entry.value)} (${pct.toFixed(0)}%)`;
+                }}
                 labelLine={false}
                 fontSize={11}
               >
@@ -156,7 +176,7 @@ export function DonutChart({
                 ))}
               </Pie>
               <Tooltip
-                formatter={(value: number) => fmtCompact(value)}
+                formatter={(value: number) => valueFormatter(value)}
                 contentStyle={{
                   fontSize: 12,
                   borderRadius: 8,
@@ -182,11 +202,15 @@ export function MonthlyTrendLine({
   title,
   subtitle,
   color = "#22C55E",
+  valueFormatter = fmtCompact,
+  tooltipLabel = "Revenue",
 }: {
   data: { month: string; value: number }[];
   title: string;
   subtitle?: string;
   color?: string;
+  valueFormatter?: (n: number) => string;
+  tooltipLabel?: string;
 }) {
   return (
     <div className="card p-4 h-[380px] flex flex-col">
@@ -203,7 +227,7 @@ export function MonthlyTrendLine({
           <ResponsiveContainer width="100%" height="100%">
             <LineChart
               data={data}
-              margin={{ top: 10, right: 30, bottom: 0, left: 0 }}
+              margin={{ top: 22, right: 30, bottom: 0, left: 0 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
               <XAxis
@@ -213,13 +237,13 @@ export function MonthlyTrendLine({
                 tickLine={false}
               />
               <YAxis
-                tickFormatter={fmtCompact}
+                tickFormatter={valueFormatter}
                 tick={{ fontSize: 10, fill: "#94A3B8" }}
                 axisLine={false}
                 tickLine={false}
               />
               <Tooltip
-                formatter={(value: number) => [fmtCompact(value), "Revenue"]}
+                formatter={(value: number) => [valueFormatter(value), tooltipLabel]}
                 contentStyle={{
                   fontSize: 12,
                   borderRadius: 8,
@@ -233,7 +257,18 @@ export function MonthlyTrendLine({
                 strokeWidth={2}
                 dot={{ r: 3, fill: color }}
                 activeDot={{ r: 5 }}
-              />
+              >
+                <LabelList
+                  dataKey="value"
+                  position="top"
+                  formatter={valueFormatter}
+                  style={{
+                    fontSize: 10,
+                    fill: "#475569",
+                    fontWeight: 500,
+                  }}
+                />
+              </Line>
             </LineChart>
           </ResponsiveContainer>
         )}

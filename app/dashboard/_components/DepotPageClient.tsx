@@ -203,11 +203,14 @@ export function DepotPageClient({ data }: Props) {
           title="Tanks by Country"
           subtitle="Top depots aggregated by country"
           color="#3B82F6"
+          valueFormatter={(n) => n.toLocaleString("en-IN")}
+          tooltipLabel="Tanks"
         />
         <DonutChart
           data={statusDonut}
           title="Tank Status Mix"
           subtitle="Distribution across all depots"
+          valueFormatter={(n) => n.toLocaleString("en-IN")}
         />
       </div>
 
@@ -484,6 +487,112 @@ export function DepotPageClient({ data }: Props) {
                 </tr>
               )}
             </tbody>
+            {grouped.length > 0 && (
+              <tfoot>
+                <tr className="total-row border-t-2 border-surface-border bg-surface-subtle">
+                  <td className="px-4 py-2.5">
+                    <div className="inline-flex items-center gap-2">
+                      <CustomerAvatar name="TT" />
+                      <span className="font-semibold text-ink-primary">
+                        GRAND TOTAL
+                      </span>
+                      <span className="text-ink-tertiary text-[11px] font-normal">
+                        · {data.rows.length} depot{data.rows.length === 1 ? "" : "s"} ·{" "}
+                        {grouped.length} countries
+                      </span>
+                    </div>
+                  </td>
+                  <td className="text-right px-3 py-2.5">
+                    {clickableCount(
+                      data.kpis.total,
+                      () =>
+                        openDrill({
+                          title: "All Tanks at Depot",
+                          subtitle: `${data.kpis.total.toLocaleString("en-IN")} tanks across ${data.rows.length} depots`,
+                          cellCount: data.kpis.total,
+                        }),
+                      true
+                    )}
+                  </td>
+                  <td className="text-right px-3 py-2.5">
+                    {clickableCount(
+                      data.kpis.allocated,
+                      () =>
+                        openDrill({
+                          title: "All Allocated Tanks",
+                          subtitle: `${data.kpis.allocated.toLocaleString("en-IN")} allocated`,
+                          cellCount: data.kpis.allocated,
+                          bucket: "allocated",
+                        }),
+                      true
+                    )}
+                  </td>
+                  <td className="text-right px-3 py-2.5">
+                    {clickableCount(
+                      data.kpis.underCleaning,
+                      () =>
+                        openDrill({
+                          title: "All Under Cleaning",
+                          subtitle: `${data.kpis.underCleaning.toLocaleString("en-IN")} tanks`,
+                          cellCount: data.kpis.underCleaning,
+                          bucket: "underCleaning",
+                        }),
+                      true
+                    )}
+                  </td>
+                  <td className="text-right px-3 py-2.5">
+                    {clickableCount(
+                      data.kpis.underRepair,
+                      () =>
+                        openDrill({
+                          title: "All Under Repair",
+                          subtitle: `${data.kpis.underRepair.toLocaleString("en-IN")} tanks`,
+                          cellCount: data.kpis.underRepair,
+                          bucket: "underRepair",
+                        }),
+                      true
+                    )}
+                  </td>
+                  <td className="text-right px-3 py-2.5">
+                    {clickableCount(
+                      data.kpis.underSurvey,
+                      () =>
+                        openDrill({
+                          title: "All Under Survey",
+                          subtitle: `${data.kpis.underSurvey.toLocaleString("en-IN")} tanks`,
+                          cellCount: data.kpis.underSurvey,
+                          bucket: "underSurvey",
+                        }),
+                      true
+                    )}
+                  </td>
+                  {data.ageingBuckets.map((b) => {
+                    const total = grouped.reduce(
+                      (s, g) => s + (g.totals.buckets[b] || 0),
+                      0
+                    );
+                    return (
+                      <td
+                        key={`total-${b}`}
+                        className="text-right px-3 py-2.5"
+                      >
+                        {clickableCount(
+                          total,
+                          () =>
+                            openDrill({
+                              title: `All ${b}`,
+                              subtitle: `${total.toLocaleString("en-IN")} tanks (ageing ${b})`,
+                              cellCount: total,
+                              ageing: b,
+                            }),
+                          true
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              </tfoot>
+            )}
           </table>
         </div>
       </div>
