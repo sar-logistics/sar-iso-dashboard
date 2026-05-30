@@ -42,6 +42,7 @@ export default async function DepotPage() {
                 year: "numeric",
                 hour: "2-digit",
                 minute: "2-digit",
+                timeZone: "Asia/Kolkata",
               })}
             </span>
           </div>
