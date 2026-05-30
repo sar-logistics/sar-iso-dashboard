@@ -1,8 +1,8 @@
-import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import SignOutButton from "./SignOutButton";
 import { titleCase } from "@/lib/utils";
+import { SidebarNav } from "./_components/SidebarNav";
 
 export default async function DashboardLayout({
   children,
@@ -20,40 +20,24 @@ export default async function DashboardLayout({
             S
           </div>
           <div>
-            <div className="text-sm font-semibold text-ink-primary leading-tight">SAR ISO Tank</div>
-            <div className="text-[10px] text-ink-tertiary leading-tight">Business Dashboard</div>
+            <div className="text-sm font-semibold text-ink-primary leading-tight">
+              SAR ISO Tank
+            </div>
+            <div className="text-[10px] text-ink-tertiary leading-tight">
+              Business Dashboard
+            </div>
           </div>
         </div>
 
-        <nav className="flex-1 px-2 py-4 space-y-5">
-          <div>
-            <div className="sidebar-section-label text-sales-text">Sales</div>
-            <Link href="/dashboard" className="sidebar-link sidebar-link-active">
-              Sales Performance
-            </Link>
-          </div>
-
-          <div>
-            <div className="sidebar-section-label text-mr-text">M&amp;R</div>
-            <div className="space-y-0.5 opacity-50">
-              <div className="sidebar-link cursor-not-allowed">Available Tanks</div>
-              <div className="sidebar-link cursor-not-allowed">Under Repair</div>
-            </div>
-          </div>
-
-          <div>
-            <div className="sidebar-section-label text-finance-text">Finance</div>
-            <div className="space-y-0.5 opacity-50">
-              <div className="sidebar-link cursor-not-allowed">Outstanding (soon)</div>
-            </div>
-          </div>
-        </nav>
+        <SidebarNav />
 
         <div className="p-3 border-t border-surface-border">
           <div className="text-sm font-medium text-ink-primary truncate">
             {titleCase(session.user.name || session.user.email || "")}
           </div>
-          <div className="text-[11px] text-ink-tertiary truncate">{session.user.email}</div>
+          <div className="text-[11px] text-ink-tertiary truncate">
+            {session.user.email}
+          </div>
           <SignOutButton />
         </div>
       </aside>
