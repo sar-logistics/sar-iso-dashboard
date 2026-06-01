@@ -8,7 +8,8 @@ import {
   getEffectiveDateRange,
 } from "@/lib/trend";
 import { DashboardTabs } from "./_components/DashboardTabs";
-import { CurrencyProvider, parseCurrencyParams } from "@/lib/currency";
+import { CurrencyProvider } from "@/lib/currency-context";
+import { parseCurrencyParams } from "@/lib/currency-utils";
 
 function toIsoDate(d: Date): string {
   return d.toISOString().slice(0, 10);

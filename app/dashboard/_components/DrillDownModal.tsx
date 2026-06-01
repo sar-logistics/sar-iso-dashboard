@@ -2,7 +2,8 @@
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { titleCase } from "@/lib/utils";
-import { useCurrency, fmtMoney } from "@/lib/currency";
+import { useCurrency } from "@/lib/currency-context";
+import { fmtMoney } from "@/lib/currency-utils";
 
 interface DetailRow {
   _id: string;

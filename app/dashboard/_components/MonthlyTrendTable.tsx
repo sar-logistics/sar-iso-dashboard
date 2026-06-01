@@ -2,7 +2,8 @@
 import { useState } from "react";
 import { ChevronRight, ChevronDown } from "lucide-react";
 import { titleCase } from "@/lib/utils";
-import { useCurrency, fmtMoneyCompact, convert } from "@/lib/currency";
+import { useCurrency } from "@/lib/currency-context";
+import { fmtMoneyCompact, convert } from "@/lib/currency-utils";
 import { CustomerAvatar } from "./CustomerAvatar";
 import { DrillDownModal, DrillContext } from "./DrillDownModal";
 

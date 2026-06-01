@@ -1,40 +1,11 @@
-"use client";
-import {
-  createContext,
-  useContext,
-  type ReactNode,
-} from "react";
+// Pure currency utilities — safe to import from both server and client components.
+// NO "use client" directive here — that lives in currency-context.tsx.
 
 export type CurrencyMode = "USD" | "INR";
 
-interface CurrencyState {
-  currency: CurrencyMode;
-  inrRate: number; // USD → INR multiplier
-}
-
-const CurrencyContext = createContext<CurrencyState>({
-  currency: "USD",
-  inrRate: 83,
-});
-
-export function useCurrency(): CurrencyState {
-  return useContext(CurrencyContext);
-}
-
-export function CurrencyProvider({
-  children,
-  currency,
-  inrRate,
-}: {
-  children: ReactNode;
+export interface CurrencyState {
   currency: CurrencyMode;
   inrRate: number;
-}) {
-  return (
-    <CurrencyContext.Provider value={{ currency, inrRate }}>
-      {children}
-    </CurrencyContext.Provider>
-  );
 }
 
 /** Convert a USD value to the currently selected currency. */
@@ -73,13 +44,11 @@ export function fmtMoneyCompact(
   const abs = Math.abs(v);
 
   if (cur === "INR") {
-    // Indian convention: Lakh (L), Crore (Cr)
     if (abs >= 10_000_000) return `${sign}${sym}${(abs / 10_000_000).toFixed(2)}Cr`;
     if (abs >= 100_000) return `${sign}${sym}${(abs / 100_000).toFixed(2)}L`;
     if (abs >= 1_000) return `${sign}${sym}${(abs / 1_000).toFixed(1)}K`;
     return `${sign}${sym}${abs.toFixed(0)}`;
   }
-  // USD
   if (abs >= 1_000_000) return `${sign}${sym}${(abs / 1_000_000).toFixed(2)}M`;
   if (abs >= 1_000) return `${sign}${sym}${(abs / 1_000).toFixed(1)}K`;
   return `${sign}${sym}${abs.toFixed(0)}`;
@@ -90,7 +59,7 @@ export function parseCurrencyParams(sp: {
   currency?: string;
   inrRate?: string;
 }): CurrencyState {
-  const currency = sp.currency === "INR" ? "INR" : "USD";
+  const currency: CurrencyMode = sp.currency === "INR" ? "INR" : "USD";
   let inrRate = parseFloat(sp.inrRate || "83");
   if (!isFinite(inrRate) || inrRate <= 0) inrRate = 83;
   return { currency, inrRate };

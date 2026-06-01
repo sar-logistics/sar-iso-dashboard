@@ -1,7 +1,8 @@
 "use client";
 import { useState } from "react";
 import { titleCase } from "@/lib/utils";
-import { useCurrency, fmtMoneyCompact, convert } from "@/lib/currency";
+import { useCurrency } from "@/lib/currency-context";
+import { fmtMoneyCompact, convert } from "@/lib/currency-utils";
 import { KPICard } from "./KPICard";
 import { MonthlyTrendTable, MonthlyTrendData } from "./MonthlyTrendTable";
 import {

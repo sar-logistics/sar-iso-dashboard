@@ -1,5 +1,6 @@
 "use client";
-import { useCurrency, fmtMoney } from "@/lib/currency";
+import { useCurrency } from "@/lib/currency-context";
+import { fmtMoney } from "@/lib/currency-utils";
 
 interface KPICardProps {
   label: string;
