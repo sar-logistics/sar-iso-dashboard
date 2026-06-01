@@ -1,21 +1,26 @@
 import { Suspense } from "react";
 import { getDb } from "@/lib/mongodb";
 import { FilterBar } from "./_components/FilterBar";
-import { buildPeriodTrend, monthRangeLabel, parseViewParams } from "@/lib/trend";
+import {
+  buildPeriodTrend,
+  monthRangeLabel,
+  parseViewParams,
+  getEffectiveDateRange,
+} from "@/lib/trend";
 import { DashboardTabs } from "./_components/DashboardTabs";
-import SyncButton from "./SyncButton";
 
-async function loadKpis(fromDate: Date | null, toDate: Date | null) {
+function toIsoDate(d: Date): string {
+  return d.toISOString().slice(0, 10); // yyyy-mm-dd
+}
+
+async function loadKpis(fromDate: Date, toDate: Date) {
   const db = await getDb();
   const col = db.collection("salesRegister");
 
-  // Use actual invoiceDate range — works for day-level (custom) and month-level
-  const dateFilter =
-    fromDate && toDate
-      ? { invoiceDate: { $gte: fromDate, $lte: toDate } }
-      : {};
+  const dateFilter = { invoiceDate: { $gte: fromDate, $lte: toDate } };
 
-  const [totalAgg, catAgg, creditAgg, lastSyncArr] = await Promise.all([
+  const [totalAgg, catAgg, lastSyncArr] = await Promise.all([
+    // Total Revenue is NET of credit notes — include all rows
     col
       .aggregate([
         { $match: dateFilter },
@@ -28,9 +33,12 @@ async function loadKpis(fromDate: Date | null, toDate: Date | null) {
         },
       ])
       .toArray(),
+
+    // Bucket totals — credit notes are now INCLUDED so they net against
+    // their matching bucket (e.g. Lease credit reduces Lease revenue).
     col
       .aggregate([
-        { $match: { revenueCategory: { $ne: "Credit Note" }, ...dateFilter } },
+        { $match: dateFilter },
         {
           $group: {
             _id: "$chargeRevenueCategory",
@@ -39,12 +47,7 @@ async function loadKpis(fromDate: Date | null, toDate: Date | null) {
         },
       ])
       .toArray(),
-    col
-      .aggregate([
-        { $match: { revenueCategory: "Credit Note", ...dateFilter } },
-        { $group: { _id: null, total: { $sum: "$amountInChargeCurrency" } } },
-      ])
-      .toArray(),
+
     db
       .collection("syncLogs")
       .find({ sheetName: "Sales Register" })
@@ -64,7 +67,6 @@ async function loadKpis(fromDate: Date | null, toDate: Date | null) {
     exim: byCharge["EXIM"] || 0,
     mr: byCharge["M&R"] || 0,
     unmapped: byCharge["Unmapped"] || 0,
-    creditNotes: creditAgg[0]?.total || 0,
     lastSync: lastSyncArr[0] || null,
   };
 }
@@ -74,7 +76,13 @@ export default async function DashboardHome({
 }: {
   searchParams: { view?: string; from?: string; to?: string };
 }) {
-  const { view, fromDate, toDate } = parseViewParams(searchParams);
+  const { view, fromDate: paramFrom, toDate: paramTo } =
+    parseViewParams(searchParams);
+  const { fromDate, toDate } = await getEffectiveDateRange(
+    view,
+    paramFrom,
+    paramTo
+  );
 
   const [k, customerTrend, tradeLaneTrend] = await Promise.all([
     loadKpis(fromDate, toDate),
@@ -86,19 +94,15 @@ export default async function DashboardHome({
 
   return (
     <div className="p-6 max-w-[1600px] mx-auto">
-      <div className="flex items-end justify-between mb-5">
-        <div>
-          <h1 className="text-xl font-semibold text-ink-primary">
-            Sales Performance
-          </h1>
-          <p className="text-xs text-ink-tertiary mt-0.5">
-            ISO Tank · Charts and detailed breakdowns by agent and trade lane
-          </p>
-        </div>
-        <SyncButton />
+      <div className="mb-5">
+        <h1 className="text-xl font-semibold text-ink-primary">
+          Sales Performance
+        </h1>
+        <p className="text-xs text-ink-tertiary mt-0.5">
+          ISO Tank · Charts and detailed breakdowns by agent and trade lane
+        </p>
       </div>
 
-      {/* FilterBar uses useSearchParams — must be in Suspense */}
       <Suspense
         fallback={
           <div className="card h-12 mb-5 animate-pulse bg-surface-muted" />
@@ -106,8 +110,8 @@ export default async function DashboardHome({
       >
         <FilterBar
           currentView={searchParams.view === "custom" ? "custom" : view}
-          currentFrom={searchParams.from || ""}
-          currentTo={searchParams.to || ""}
+          currentFrom={searchParams.from || toIsoDate(fromDate)}
+          currentTo={searchParams.to || toIsoDate(toDate)}
           fromLabel={range.from}
           toLabel={range.to}
           lastSyncedAt={k.lastSync?.syncedAt}
@@ -124,7 +128,6 @@ export default async function DashboardHome({
           exim: k.exim,
           mr: k.mr,
           unmapped: k.unmapped,
-          creditNotes: k.creditNotes,
         }}
         customerTrend={customerTrend}
         tradeLaneTrend={tradeLaneTrend}
@@ -133,8 +136,8 @@ export default async function DashboardHome({
       {k.unmapped > 0 && (
         <div className="mt-4 text-xs text-warning-text bg-warning/40 rounded-md px-3 py-2 inline-block">
           ⚠️ ${(k.unmapped / 1000).toFixed(1)}K of charges are not in your
-          &ldquo;Charge to Revenue Type Mapping&rdquo; sheet. Add them and click
-          Sync Now.
+          &ldquo;Charge to Revenue Type Mapping&rdquo; sheet. Add them — the
+          next hourly sync will pick them up.
         </div>
       )}
     </div>

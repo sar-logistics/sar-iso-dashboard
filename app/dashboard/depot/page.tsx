@@ -1,7 +1,6 @@
 import { buildDepotData } from "@/lib/depotData";
 import { getDb } from "@/lib/mongodb";
 import { DepotPageClient } from "../_components/DepotPageClient";
-import SyncButton from "../SyncButton";
 
 async function getLastSync() {
   const db = await getDb();
@@ -19,16 +18,13 @@ export default async function DepotPage() {
 
   return (
     <div className="p-6 max-w-[1600px] mx-auto">
-      <div className="flex items-end justify-between mb-5">
-        <div>
-          <h1 className="text-xl font-semibold text-ink-primary">
-            Depot Report
-          </h1>
-          <p className="text-xs text-ink-tertiary mt-0.5">
-            Tank stock by depot · ageing buckets · click any number for tank details
-          </p>
-        </div>
-        <SyncButton />
+      <div className="mb-5">
+        <h1 className="text-xl font-semibold text-ink-primary">
+          Depot Report
+        </h1>
+        <p className="text-xs text-ink-tertiary mt-0.5">
+          Tank stock by depot · ageing buckets · click any number for tank details
+        </p>
       </div>
 
       {lastSync && (

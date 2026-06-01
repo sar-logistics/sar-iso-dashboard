@@ -16,7 +16,7 @@ function bucketFor(
   chargeCategory: string,
   invoiceCategory: string
 ): Bucket | "Other" | null {
-  if (invoiceCategory === "Credit Note") return null;
+  // Credit notes are INCLUDED so they net against their matching revenue bucket.
   const c = (chargeCategory || "").trim();
   if (c === "Detention") return "Detention";
   if (c === "EXIM") return "EXIM";
@@ -245,11 +245,34 @@ export async function buildPeriodTrend(
   const groupKeyExpr =
     groupBy === "tradeLane"
       ? {
-          $concat: [
-            { $ifNull: ["$pol", "—"] },
-            " → ",
-            { $ifNull: ["$pod", "—"] },
-          ],
+          $let: {
+            vars: {
+              p: {
+                $trim: { input: { $ifNull: ["$pol", ""] } },
+              },
+              d: {
+                $trim: { input: { $ifNull: ["$pod", ""] } },
+              },
+            },
+            in: {
+              $cond: {
+                if: {
+                  $and: [
+                    { $eq: ["$$p", ""] },
+                    { $eq: ["$$d", ""] },
+                  ],
+                },
+                then: "No Trade Lane / Sundry",
+                else: {
+                  $concat: [
+                    { $cond: [{ $eq: ["$$p", ""] }, "—", "$$p"] },
+                    " → ",
+                    { $cond: [{ $eq: ["$$d", ""] }, "—", "$$d"] },
+                  ],
+                },
+              },
+            },
+          },
         }
       : "$partyName";
 
@@ -449,4 +472,83 @@ export function parseViewParams(sp: {
     }
   }
   return { view, fromDate, toDate };
+}
+
+const MS_PER_DAY = 86_400_000;
+const MAX_WEEKLY_DAYS = 5 * 7 - 1; // 5 ISO weeks span 34 days inclusive
+
+/**
+ * Determine the effective FROM/TO range used for KPIs and charts.
+ * - If the user gave explicit dates, use them (clamped for weekly).
+ * - Otherwise compute a sensible default based on the latest invoice date.
+ */
+export async function getEffectiveDateRange(
+  view: ViewMode,
+  fromDate: Date | null,
+  toDate: Date | null
+): Promise<{ fromDate: Date; toDate: Date }> {
+  const db = await getDb();
+  const r = await db
+    .collection("salesRegister")
+    .aggregate([
+      { $match: { invoiceDate: { $ne: null } } },
+      { $group: { _id: null, max: { $max: "$invoiceDate" } } },
+    ])
+    .toArray();
+  const maxDate: Date = r[0]?.max ? new Date(r[0].max) : new Date();
+
+  // Effective TO: explicit toDate, else end of month containing max invoice
+  let effTo: Date;
+  if (toDate) {
+    effTo = toDate;
+  } else {
+    effTo = new Date(
+      Date.UTC(
+        maxDate.getUTCFullYear(),
+        maxDate.getUTCMonth() + 1,
+        0,
+        23,
+        59,
+        59,
+        999
+      )
+    );
+  }
+
+  // Effective FROM
+  let effFrom: Date;
+  if (fromDate) {
+    effFrom = fromDate;
+  } else if (view === "weekly") {
+    effFrom = new Date(effTo);
+    effFrom.setUTCDate(effFrom.getUTCDate() - MAX_WEEKLY_DAYS);
+    effFrom.setUTCHours(0, 0, 0, 0);
+  } else {
+    let monthsBack: number;
+    switch (view) {
+      case "quarterly":
+        monthsBack = 23;
+        break;
+      case "yearly":
+        monthsBack = 35;
+        break;
+      default:
+        monthsBack = 11;
+    }
+    effFrom = new Date(
+      Date.UTC(effTo.getUTCFullYear(), effTo.getUTCMonth() - monthsBack, 1, 0, 0, 0)
+    );
+  }
+
+  // Enforce 5-week cap on weekly view — trim from the start so most recent is shown
+  if (view === "weekly") {
+    const spanDays = (effTo.getTime() - effFrom.getTime()) / MS_PER_DAY;
+    if (spanDays > MAX_WEEKLY_DAYS) {
+      effFrom = new Date(effTo);
+      effFrom.setUTCDate(effFrom.getUTCDate() - MAX_WEEKLY_DAYS);
+      effFrom.setUTCHours(0, 0, 0, 0);
+    }
+  }
+
+  return { fromDate: effFrom, toDate: effTo };
 }

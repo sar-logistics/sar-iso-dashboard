@@ -10,6 +10,7 @@ interface DetailRow {
   invoiceType: string;
   partyName: string;
   chargeName: string;
+  blNo: string;
   pol: string;
   pod: string;
   qty: number;
@@ -22,6 +23,8 @@ export interface DrillContext {
   customer: string | null;
   pol: string | null;
   pod: string | null;
+  polEmpty?: boolean;
+  podEmpty?: boolean;
   customerLabel: string;
   year: number;
   month: number;
@@ -60,6 +63,8 @@ export function DrillDownModal({ ctx, onClose }: Props) {
     if (ctx.customer) params.set("customer", ctx.customer);
     if (ctx.pol) params.set("pol", ctx.pol);
     if (ctx.pod) params.set("pod", ctx.pod);
+    if (ctx.polEmpty) params.set("polEmpty", "1");
+    if (ctx.podEmpty) params.set("podEmpty", "1");
     if (ctx.bucket) params.set("bucket", ctx.bucket);
     if (ctx.chargeName) params.set("chargeName", ctx.chargeName);
 
@@ -139,6 +144,7 @@ export function DrillDownModal({ ctx, onClose }: Props) {
                 <tr className="text-[11px] uppercase tracking-wider text-ink-tertiary">
                   <th className="px-3 py-2.5 text-left">Date</th>
                   <th className="px-3 py-2.5 text-left">Invoice No</th>
+                  <th className="px-3 py-2.5 text-left">BL No</th>
                   {showCustomer && <th className="px-3 py-2.5 text-left">Agent</th>}
                   <th className="px-3 py-2.5 text-left">Charge Name</th>
                   {showPolPod && (
@@ -163,6 +169,9 @@ export function DrillDownModal({ ctx, onClose }: Props) {
                     </td>
                     <td className="px-3 py-2 font-mono text-[11px] text-ink-secondary whitespace-nowrap">
                       {r.invoiceNo}
+                    </td>
+                    <td className="px-3 py-2 font-mono text-[11px] text-ink-secondary whitespace-nowrap">
+                      {r.blNo || "—"}
                     </td>
                     {showCustomer && (
                       <td className="px-3 py-2 text-ink-primary">{titleCase(r.partyName)}</td>
@@ -191,7 +200,7 @@ export function DrillDownModal({ ctx, onClose }: Props) {
                 <tr className="text-xs font-semibold">
                   <td
                     className="px-3 py-2.5 text-left"
-                    colSpan={2 + (showCustomer ? 1 : 0) + 1 + (showPolPod ? 1 : 0) + 2}
+                    colSpan={3 + (showCustomer ? 1 : 0) + 1 + (showPolPod ? 1 : 0) + 2}
                   >
                     Total
                   </td>

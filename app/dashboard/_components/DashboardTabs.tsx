@@ -17,7 +17,6 @@ interface Kpis {
   exim: number;
   mr: number;
   unmapped: number;
-  creditNotes: number;
 }
 
 interface Props {
@@ -42,10 +41,16 @@ export function DashboardTabs({ kpis, customerTrend, tradeLaneTrend }: Props) {
     value: r.total,
   }));
 
-  const topTradeLanes = tradeLaneTrend.rows.slice(0, 10).map((r) => ({
-    name: r.group,
-    value: r.total,
-  }));
+  // Trade lane chart should never include "No Trade Lane / Sundry" — that's
+  // bookkeeping noise and would dominate the visual. The detail table still
+  // shows it for transparency.
+  const topTradeLanes = tradeLaneTrend.rows
+    .filter((r) => r.group !== "No Trade Lane / Sundry")
+    .slice(0, 10)
+    .map((r) => ({
+      name: r.group,
+      value: r.total,
+    }));
 
   const revenueMix = [
     { name: "Lease", value: kpis.lease },
@@ -55,7 +60,7 @@ export function DashboardTabs({ kpis, customerTrend, tradeLaneTrend }: Props) {
     ...(kpis.unmapped > 0 ? [{ name: "Unmapped", value: kpis.unmapped }] : []),
   ].filter((d) => d.value > 0);
 
-  // Monthly trend = sum of grand-total primary row across months
+  // Monthly trend = grand-total primary row across the period
   const monthlyTrend = customerTrend.months.map((m) => {
     const primary = customerTrend.grandTotal.metrics.find((x) => x.level === "primary");
     return { month: m.label, value: primary?.monthly[m.key] || 0 };
@@ -81,42 +86,36 @@ export function DashboardTabs({ kpis, customerTrend, tradeLaneTrend }: Props) {
 
       {tab === "overview" && (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
             <KPICard
               label="Total Revenue"
               value={kpis.totalRevenue}
-              subtitle={`Across ${kpis.totalRows.toLocaleString("en-IN")} invoice lines`}
+              subtitle={`Net of credit notes · ${kpis.totalRows.toLocaleString("en-IN")} lines`}
               accent="bg-accent-green"
             />
             <KPICard
               label="Lease Revenue"
               value={kpis.lease}
-              subtitle="Lease Rent Charges"
+              subtitle="Net of credit notes"
               accent="bg-accent-blue"
             />
             <KPICard
               label="Detention Revenue"
               value={kpis.detention}
-              subtitle="Detention, DEM-IMP, DEM-EXP"
+              subtitle="Net of credit notes"
               accent="bg-accent-orange"
             />
             <KPICard
               label="EXIM Revenue"
               value={kpis.exim}
-              subtitle="Freight, handling, docs, customs"
+              subtitle="Net of credit notes"
               accent="bg-accent-yellow"
             />
             <KPICard
               label="M&R Revenue"
               value={kpis.mr}
-              subtitle="Repair, cleaning, storage"
+              subtitle="Net of credit notes"
               accent="bg-accent-pink"
-            />
-            <KPICard
-              label="Credit Notes"
-              value={kpis.creditNotes}
-              subtitle="Net of all credits"
-              accent="bg-accent-purple"
             />
           </div>
 
@@ -124,7 +123,7 @@ export function DashboardTabs({ kpis, customerTrend, tradeLaneTrend }: Props) {
             <HorizontalBarChart
               data={topTradeLanes}
               title="Revenue by Trade Lane"
-              subtitle="Top 10 trade lanes (POL → POD)"
+              subtitle="Top 10 trade lanes (excludes sundry / no-BL entries)"
               color="#3B82F6"
             />
             <DonutChart
@@ -143,8 +142,8 @@ export function DashboardTabs({ kpis, customerTrend, tradeLaneTrend }: Props) {
             />
             <MonthlyTrendLine
               data={monthlyTrend}
-              title="Monthly Revenue Trend"
-              subtitle="Total revenue per month (excl. credit notes)"
+              title="Revenue Trend"
+              subtitle="Total revenue per period (net of credit notes)"
               color="#A855F7"
             />
           </div>

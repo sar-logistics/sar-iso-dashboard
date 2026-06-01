@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Calendar, ChevronDown, Filter, ArrowUpDown } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 
 interface Props {
   currentView: "monthly" | "weekly" | "quarterly" | "yearly" | "custom";
@@ -14,11 +14,11 @@ interface Props {
 }
 
 const VIEW_OPTIONS = [
-  { value: "monthly", label: "Monthly View", disabled: false, badge: null },
-  { value: "weekly", label: "Last 5 Weeks", disabled: false, badge: null },
-  { value: "quarterly", label: "Quarterly View", disabled: false, badge: null },
-  { value: "yearly", label: "Yearly View", disabled: false, badge: null },
-  { value: "custom", label: "Custom Range", disabled: false, badge: null },
+  { value: "monthly", label: "Monthly View", disabled: false },
+  { value: "weekly", label: "Weekly View", disabled: false },
+  { value: "quarterly", label: "Quarterly View", disabled: false },
+  { value: "yearly", label: "Yearly View", disabled: false },
+  { value: "custom", label: "Custom Range", disabled: false },
 ];
 
 function fmtSync(d?: Date | string): string {
@@ -35,19 +35,28 @@ function fmtSync(d?: Date | string): string {
   });
 }
 
+/** Convert a Date or "yyyy-mm-dd" string into "yyyy-mm-dd" for input value. */
+function toInputDate(s: string): string {
+  if (!s) return "";
+  // Already yyyy-mm-dd?
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  if (/^\d{4}-\d{2}$/.test(s)) return s + "-01";
+  return "";
+}
+
 export function FilterBar({
   currentView,
   currentFrom,
   currentTo,
-  fromLabel,
-  toLabel,
   lastSyncedAt,
   rowsSynced,
 }: Props) {
   const router = useRouter();
   const sp = useSearchParams();
-  const isCustom = (sp.get("view") || "") === "custom";
-  const selectedView = isCustom ? "custom" : currentView;
+  const urlView = sp.get("view") || "";
+  // Treat "custom" specially in the dropdown label
+  const selectedView =
+    urlView === "custom" ? "custom" : (currentView as string);
 
   const navigate = (params: URLSearchParams) => {
     const qs = params.toString();
@@ -56,28 +65,28 @@ export function FilterBar({
 
   const handleViewChange = (newView: string) => {
     const params = new URLSearchParams(sp.toString());
+    // Switching view: keep any explicit dates the user has set
     if (newView === "monthly") {
       params.delete("view");
-      params.delete("from");
-      params.delete("to");
-    } else if (newView === "custom") {
-      params.set("view", "custom");
-      // Keep existing from/to if any
     } else {
       params.set("view", newView);
-      params.delete("from");
-      params.delete("to");
     }
     navigate(params);
   };
 
   const handleDateChange = (which: "from" | "to", value: string) => {
     const params = new URLSearchParams(sp.toString());
-    params.set("view", "custom");
     if (value) params.set(which, value);
     else params.delete(which);
+    // If user is editing dates while a named view is active, keep that view.
+    // Only flip to "custom" if neither view nor date params existed before.
+    if (!params.get("view") && (params.get("from") || params.get("to"))) {
+      // user is on default monthly + setting dates — keep monthly
+    }
     navigate(params);
   };
+
+  const isWeekly = selectedView === "weekly";
 
   return (
     <div className="card bg-white px-4 py-3 flex items-center flex-wrap gap-x-5 gap-y-2 mb-5 text-xs">
@@ -92,38 +101,24 @@ export function FilterBar({
         <span className="text-ink-tertiary uppercase tracking-wider text-[10px] font-medium">
           From
         </span>
-        {isCustom ? (
-          <input
-            type="date"
-            value={currentFrom}
-            onChange={(e) => handleDateChange("from", e.target.value)}
-            className="bg-surface-muted px-2.5 py-1.5 rounded-md text-ink-primary border border-surface-border focus:ring-2 focus:ring-info focus:outline-none text-xs"
-          />
-        ) : (
-          <span className="inline-flex items-center gap-1.5 bg-surface-muted px-2.5 py-1.5 rounded-md text-ink-primary">
-            <Calendar size={12} />
-            {fromLabel}
-          </span>
-        )}
+        <input
+          type="date"
+          value={toInputDate(currentFrom)}
+          onChange={(e) => handleDateChange("from", e.target.value)}
+          className="bg-surface-muted px-2.5 py-1.5 rounded-md text-ink-primary border border-surface-border focus:ring-2 focus:ring-info focus:outline-none text-xs"
+        />
       </div>
 
       <div className="flex items-center gap-2">
         <span className="text-ink-tertiary uppercase tracking-wider text-[10px] font-medium">
           To
         </span>
-        {isCustom ? (
-          <input
-            type="date"
-            value={currentTo}
-            onChange={(e) => handleDateChange("to", e.target.value)}
-            className="bg-surface-muted px-2.5 py-1.5 rounded-md text-ink-primary border border-surface-border focus:ring-2 focus:ring-info focus:outline-none text-xs"
-          />
-        ) : (
-          <span className="inline-flex items-center gap-1.5 bg-surface-muted px-2.5 py-1.5 rounded-md text-ink-primary">
-            <Calendar size={12} />
-            {toLabel}
-          </span>
-        )}
+        <input
+          type="date"
+          value={toInputDate(currentTo)}
+          onChange={(e) => handleDateChange("to", e.target.value)}
+          className="bg-surface-muted px-2.5 py-1.5 rounded-md text-ink-primary border border-surface-border focus:ring-2 focus:ring-info focus:outline-none text-xs"
+        />
       </div>
 
       <div className="flex items-center gap-2">
@@ -143,19 +138,14 @@ export function FilterBar({
         </div>
       </div>
 
+      {isWeekly && (
+        <div className="text-[11px] text-ink-tertiary italic">
+          Weekly view shows at most 5 weeks. Wider ranges are auto-trimmed to
+          the most recent 5 weeks.
+        </div>
+      )}
+
       <div className="ml-auto flex items-center gap-4 text-[11px]">
-        <button
-          className="text-ink-tertiary inline-flex items-center gap-1.5 cursor-not-allowed"
-          title="Filters coming soon"
-        >
-          <Filter size={12} /> Filters
-        </button>
-        <button
-          className="text-ink-tertiary inline-flex items-center gap-1.5 cursor-not-allowed"
-          title="Sort coming soon"
-        >
-          <ArrowUpDown size={12} /> Sort
-        </button>
         {lastSyncedAt && (
           <span className="text-ink-tertiary">
             Last sync {fmtSync(lastSyncedAt)} ·{" "}
@@ -179,7 +169,9 @@ function ViewDropdown({
 
   useEffect(() => {
     const onDoc = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
     };
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
@@ -195,7 +187,10 @@ function ViewDropdown({
         className="bg-surface-muted hover:bg-surface-border transition px-3 py-1.5 rounded-md inline-flex items-center gap-2 text-ink-primary text-xs font-medium"
       >
         {currentLabel}
-        <ChevronDown size={14} className={open ? "rotate-180 transition" : "transition"} />
+        <ChevronDown
+          size={14}
+          className={open ? "rotate-180 transition" : "transition"}
+        />
       </button>
       {open && (
         <div className="absolute top-full left-0 mt-1.5 bg-white border border-surface-border rounded-md shadow-lg min-w-[170px] py-1 z-20">
@@ -209,20 +204,13 @@ function ViewDropdown({
                   setOpen(false);
                 }
               }}
-              className={`w-full text-left px-3 py-1.5 text-xs flex items-center justify-between gap-2 ${
-                opt.disabled
-                  ? "text-ink-tertiary cursor-not-allowed"
-                  : current === opt.value
-                  ? "bg-accent-green/20 text-ink-primary font-medium"
-                  : "text-ink-secondary hover:bg-surface-muted"
-              }`}
+              className={`w-full text-left px-3 py-2 text-xs hover:bg-surface-muted transition ${
+                opt.value === current
+                  ? "bg-info/30 text-ink-primary font-medium"
+                  : "text-ink-secondary"
+              } ${opt.disabled ? "cursor-not-allowed opacity-50" : ""}`}
             >
-              <span>{opt.label}</span>
-              {opt.badge && (
-                <span className="text-[9px] bg-warning/60 text-warning-text px-1.5 py-0.5 rounded font-medium">
-                  {opt.badge}
-                </span>
-              )}
+              {opt.label}
             </button>
           ))}
         </div>

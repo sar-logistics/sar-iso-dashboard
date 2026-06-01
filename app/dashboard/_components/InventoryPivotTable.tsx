@@ -21,7 +21,7 @@ export function InventoryPivotTable({ rows, totalCount }: Props) {
   const key = (n: InventoryNode) =>
     `${n.principal || ""}|${n.activity || ""}|${n.fromLocation || ""}|${
       n.toLocation || ""
-    }|${n.level}`;
+    }|${n.agent || ""}|${n.level}`;
 
   const toggle = (k: string) =>
     setExpanded((p) => {
@@ -49,6 +49,7 @@ export function InventoryPivotTable({ rows, totalCount }: Props) {
     if (n.activity) titleParts.push(n.activity);
     if (n.fromLocation) titleParts.push(`From ${n.fromLocation}`);
     if (n.toLocation) titleParts.push(`To ${n.toLocation}`);
+    if (n.agent) titleParts.push(`Agent ${titleCase(n.agent)}`);
     setDrill({
       title: titleParts.join(" · ") || "All Tanks",
       subtitle: `${n.count.toLocaleString("en-IN")} tank${n.count === 1 ? "" : "s"}`,
@@ -57,6 +58,7 @@ export function InventoryPivotTable({ rows, totalCount }: Props) {
       activity: n.activity,
       fromLocation: n.fromLocation,
       toLocation: n.toLocation,
+      agent: n.agent,
     });
   };
 
@@ -65,7 +67,7 @@ export function InventoryPivotTable({ rows, totalCount }: Props) {
       <div className="card overflow-hidden">
         <div className="px-4 py-3 border-b border-surface-border flex items-center justify-between flex-wrap gap-3">
           <div className="text-[11px] uppercase tracking-wider text-ink-tertiary">
-            Inventory · Principal › Activity › From › To
+            Inventory · Principal › Activity › From › To › Agent
           </div>
           <div className="flex items-center gap-3">
             <button
@@ -135,7 +137,7 @@ export function InventoryPivotTable({ rows, totalCount }: Props) {
               {rows.length === 0 && (
                 <tr>
                   <td colSpan={2} className="px-4 py-8 text-center text-ink-tertiary">
-                    No inventory data. Click Sync Now to pull from Google Sheets.
+                    No inventory data yet — data refreshes hourly from Google Sheets.
                   </td>
                 </tr>
               )}
@@ -187,7 +189,9 @@ function NodeRow({
             ) : (
               <span className="inline-block w-[18px]" />
             )}
-            <span className={labelStyle}>{node.label}</span>
+            <span className={labelStyle}>
+              {node.level === "agent" ? titleCase(node.label) : node.label}
+            </span>
           </div>
         </td>
         <td className="text-right px-4 py-2 tabular-nums">
@@ -242,6 +246,20 @@ function NodeRow({
                 indent="pl-28"
                 rowClass=""
                 labelStyle="italic text-ink-tertiary text-[12px]"
+              />
+            );
+          } else if (child.level === "agent") {
+            return (
+              <NodeRow
+                key={k(child)}
+                node={child}
+                expanded={expanded}
+                toggle={toggle}
+                onDrill={onDrill}
+                k={k}
+                indent="pl-36"
+                rowClass=""
+                labelStyle="text-ink-tertiary text-[11px]"
               />
             );
           }

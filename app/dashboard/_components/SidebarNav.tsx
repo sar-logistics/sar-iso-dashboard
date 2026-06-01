@@ -16,11 +16,6 @@ const NAV_SECTIONS = [
       { href: "/dashboard/depot", label: "Depot Report" },
     ],
   },
-  {
-    title: "Finance",
-    colorClass: "text-finance-text",
-    links: [{ href: "#", label: "Outstanding (soon)", disabled: true }],
-  },
 ];
 
 export function SidebarNav() {

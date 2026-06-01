@@ -1,7 +1,6 @@
 import { buildInventoryTree } from "@/lib/inventoryTree";
 import { getDb } from "@/lib/mongodb";
 import { InventoryPageClient } from "../_components/InventoryPageClient";
-import SyncButton from "../SyncButton";
 
 async function getLastSync() {
   const db = await getDb();
@@ -19,16 +18,13 @@ export default async function InventoryPage() {
 
   return (
     <div className="p-6 max-w-[1600px] mx-auto">
-      <div className="flex items-end justify-between mb-5">
-        <div>
-          <h1 className="text-xl font-semibold text-ink-primary">
-            Current Inventory
-          </h1>
-          <p className="text-xs text-ink-tertiary mt-0.5">
-            All ISO tanks · Principal › Activity › From › To · click any number for tank-level detail
-          </p>
-        </div>
-        <SyncButton />
+      <div className="mb-5">
+        <h1 className="text-xl font-semibold text-ink-primary">
+          Current Inventory
+        </h1>
+        <p className="text-xs text-ink-tertiary mt-0.5">
+          All ISO tanks · Principal › Activity › From › To › Agent · click any number for tank-level detail
+        </p>
       </div>
 
       {lastSync && (
@@ -59,6 +55,7 @@ export default async function InventoryPage() {
         kpis={tree.kpis}
         byActivity={tree.byActivity}
         byPrincipal={tree.byPrincipal}
+        byAgent={tree.byAgent}
         rows={tree.rows}
       />
     </div>

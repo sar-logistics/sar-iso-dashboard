@@ -12,6 +12,8 @@ export async function GET(req: NextRequest) {
   const customer = sp.get("customer") || null;
   const pol = sp.get("pol") || null;
   const pod = sp.get("pod") || null;
+  const polEmpty = sp.get("polEmpty") === "1";
+  const podEmpty = sp.get("podEmpty") === "1";
   const year = parseInt(sp.get("year") || "0", 10);
   const month = parseInt(sp.get("month") || "0", 10);
   const head = sp.get("head") || "";
@@ -30,7 +32,18 @@ export async function GET(req: NextRequest) {
   };
   if (customer) filter.partyName = customer;
   if (pol) filter.pol = pol;
+  else if (polEmpty) filter.$or = [{ pol: "" }, { pol: null }, { pol: { $exists: false } }];
   if (pod) filter.pod = pod;
+  else if (podEmpty) {
+    const podCond = [{ pod: "" }, { pod: null }, { pod: { $exists: false } }];
+    if (filter.$or) {
+      // Both POL and POD empty — must match both, so use $and of two $or groups
+      filter.$and = [{ $or: filter.$or }, { $or: podCond }];
+      delete filter.$or;
+    } else {
+      filter.$or = podCond;
+    }
+  }
 
   // Apply head/bucket/charge filtering using chargeRevenueCategory
   if (level === "detail" && chargeName) {
@@ -52,6 +65,7 @@ export async function GET(req: NextRequest) {
         partyName: 1,
         chargeName: 1,
         chargeRevenueCategory: 1,
+        blNo: 1,
         pol: 1,
         pod: 1,
         qty: 1,

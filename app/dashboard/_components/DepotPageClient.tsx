@@ -482,7 +482,7 @@ export function DepotPageClient({ data }: Props) {
                     colSpan={6 + data.ageingBuckets.length}
                     className="px-4 py-8 text-center text-ink-tertiary"
                   >
-                    No depot data. Click Sync Now to pull from Google Sheets.
+                    No depot data yet — data refreshes hourly from Google Sheets.
                   </td>
                 </tr>
               )}
