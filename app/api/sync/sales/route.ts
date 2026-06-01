@@ -6,6 +6,10 @@ import { mapRevenueCategory, isTotalsRow } from "@/lib/mappings";
 import { parseSheetDate, toNumber } from "@/lib/utils";
 import type { SyncLog } from "@/types";
 
+
+export const maxDuration = 60;
+export const dynamic = "force-dynamic";
+
 const SALES_SHEET = "Sales Register";
 const MAPPING_SHEET = "Charge to Revenue Type Mapping";
 const SALES_HEADER_ROW = 1; // 0-indexed; data starts at row 2
@@ -28,26 +32,55 @@ async function syncChargeMappings(): Promise<Map<string, string>> {
   const rows = await readSheet(MAPPING_SHEET);
   if (rows.length < 2) throw new Error("Charge mapping sheet is empty");
 
-  const headers = rows[0].map((h: any) => String(h || "").trim().toLowerCase());
-  const chargeIdx = headers.findIndex((h: string) => h.includes("charge name"));
-  const catIdx = headers.findIndex(
-    (h: string) => h.includes("revenue category") || h.includes("category")
-  );
-  if (chargeIdx < 0 || catIdx < 0) {
+  // Scan first 5 rows to find the header row (resilient to blank rows at top)
+  let headerRowIdx = -1;
+  let chargeIdx = -1;
+  let catIdx = -1;
+
+  for (let i = 0; i < Math.min(5, rows.length); i++) {
+    const cells = (rows[i] || []).map((h: any) =>
+      String(h || "").trim().toLowerCase()
+    );
+    const cIdx = cells.findIndex(
+      (h: string) =>
+        h.includes("charge") && (h.includes("name") || h.includes("type"))
+    );
+    const rIdx = cells.findIndex(
+      (h: string) =>
+        h.includes("revenue category") ||
+        h === "category" ||
+        h.includes("revenue type")
+    );
+    if (cIdx >= 0 && rIdx >= 0) {
+      headerRowIdx = i;
+      chargeIdx = cIdx;
+      catIdx = rIdx;
+      break;
+    }
+  }
+
+  if (headerRowIdx < 0) {
+    const debug = (rows[0] || [])
+      .map((h: any) => `"${String(h || "").trim()}"`)
+      .join(", ");
     throw new Error(
-      `Mapping sheet missing 'Charge Name' or 'Revenue Category' column`
+      `Mapping sheet: could not find 'Charge Name' and 'Revenue Category' columns. Row 1 contained: [${debug}]. Make sure the sheet "${MAPPING_SHEET}" has these column headers.`
     );
   }
 
   const map = new Map<string, string>();
   const docs: any[] = [];
-  for (let r = 1; r < rows.length; r++) {
+  for (let r = headerRowIdx + 1; r < rows.length; r++) {
     const row = rows[r] || [];
     const charge = String(row[chargeIdx] || "").trim();
     const cat = String(row[catIdx] || "").trim();
     if (!charge || !cat) continue;
     map.set(charge.toUpperCase(), cat);
-    docs.push({ chargeName: charge, revenueCategory: cat, syncedAt: new Date() });
+    docs.push({
+      chargeName: charge,
+      revenueCategory: cat,
+      syncedAt: new Date(),
+    });
   }
 
   const db = await getDb();

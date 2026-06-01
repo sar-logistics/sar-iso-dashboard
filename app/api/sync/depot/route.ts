@@ -5,6 +5,10 @@ import { readSheet } from "@/lib/google-sheets";
 import { toNumber } from "@/lib/utils";
 import type { SyncLog } from "@/types";
 
+
+export const maxDuration = 60;
+export const dynamic = "force-dynamic";
+
 const SHEET_NAME = "Depot Report";
 const HEADER_ROW = 0;
 
