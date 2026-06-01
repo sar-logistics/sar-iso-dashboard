@@ -11,10 +11,7 @@ const NAV_SECTIONS = [
   {
     title: "M\u0026R",
     colorClass: "text-mr-text",
-    links: [
-      { href: "/dashboard/inventory", label: "Current Inventory" },
-      { href: "/dashboard/depot", label: "Depot Report" },
-    ],
+    links: [{ href: "/dashboard/mr", label: "M\u0026R Operations" }],
   },
 ];
 
