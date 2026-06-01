@@ -8,9 +8,10 @@ import {
   getEffectiveDateRange,
 } from "@/lib/trend";
 import { DashboardTabs } from "./_components/DashboardTabs";
+import { CurrencyProvider, parseCurrencyParams } from "@/lib/currency";
 
 function toIsoDate(d: Date): string {
-  return d.toISOString().slice(0, 10); // yyyy-mm-dd
+  return d.toISOString().slice(0, 10);
 }
 
 async function loadKpis(fromDate: Date, toDate: Date) {
@@ -74,7 +75,13 @@ async function loadKpis(fromDate: Date, toDate: Date) {
 export default async function DashboardHome({
   searchParams,
 }: {
-  searchParams: { view?: string; from?: string; to?: string };
+  searchParams: {
+    view?: string;
+    from?: string;
+    to?: string;
+    currency?: string;
+    inrRate?: string;
+  };
 }) {
   const { view, fromDate: paramFrom, toDate: paramTo } =
     parseViewParams(searchParams);
@@ -83,6 +90,7 @@ export default async function DashboardHome({
     paramFrom,
     paramTo
   );
+  const currencyState = parseCurrencyParams(searchParams);
 
   const [k, customerTrend, tradeLaneTrend] = await Promise.all([
     loadKpis(fromDate, toDate),
@@ -93,53 +101,58 @@ export default async function DashboardHome({
   const range = monthRangeLabel(customerTrend.months);
 
   return (
-    <div className="p-6 max-w-[1600px] mx-auto">
-      <div className="mb-5">
-        <h1 className="text-xl font-semibold text-ink-primary">
-          Sales Performance
-        </h1>
-        <p className="text-xs text-ink-tertiary mt-0.5">
-          ISO Tank · Charts and detailed breakdowns by agent and trade lane
-        </p>
-      </div>
-
-      <Suspense
-        fallback={
-          <div className="card h-12 mb-5 animate-pulse bg-surface-muted" />
-        }
-      >
-        <FilterBar
-          currentView={searchParams.view === "custom" ? "custom" : view}
-          currentFrom={searchParams.from || toIsoDate(fromDate)}
-          currentTo={searchParams.to || toIsoDate(toDate)}
-          fromLabel={range.from}
-          toLabel={range.to}
-          lastSyncedAt={k.lastSync?.syncedAt}
-          rowsSynced={k.lastSync?.rowsInserted}
-        />
-      </Suspense>
-
-      <DashboardTabs
-        kpis={{
-          totalRevenue: k.totalRevenue,
-          totalRows: k.totalRows,
-          lease: k.lease,
-          detention: k.detention,
-          exim: k.exim,
-          mr: k.mr,
-          unmapped: k.unmapped,
-        }}
-        customerTrend={customerTrend}
-        tradeLaneTrend={tradeLaneTrend}
-      />
-
-      {k.unmapped > 0 && (
-        <div className="mt-4 text-xs text-warning-text bg-warning/40 rounded-md px-3 py-2 inline-block">
-          ⚠️ ${(k.unmapped / 1000).toFixed(1)}K of charges are not in your
-          &ldquo;Charge to Revenue Type Mapping&rdquo; sheet. Add them — the
-          next hourly sync will pick them up.
+    <CurrencyProvider
+      currency={currencyState.currency}
+      inrRate={currencyState.inrRate}
+    >
+      <div className="p-6 max-w-[1600px] mx-auto">
+        <div className="mb-5">
+          <h1 className="text-xl font-semibold text-ink-primary">
+            Sales Performance
+          </h1>
+          <p className="text-xs text-ink-tertiary mt-0.5">
+            ISO Tank · Charts and detailed breakdowns by agent and trade lane
+          </p>
         </div>
-      )}
-    </div>
+
+        <Suspense
+          fallback={
+            <div className="card h-12 mb-5 animate-pulse bg-surface-muted" />
+          }
+        >
+          <FilterBar
+            currentView={searchParams.view === "custom" ? "custom" : view}
+            currentFrom={searchParams.from || toIsoDate(fromDate)}
+            currentTo={searchParams.to || toIsoDate(toDate)}
+            fromLabel={range.from}
+            toLabel={range.to}
+            lastSyncedAt={k.lastSync?.syncedAt}
+            rowsSynced={k.lastSync?.rowsInserted}
+          />
+        </Suspense>
+
+        <DashboardTabs
+          kpis={{
+            totalRevenue: k.totalRevenue,
+            totalRows: k.totalRows,
+            lease: k.lease,
+            detention: k.detention,
+            exim: k.exim,
+            mr: k.mr,
+            unmapped: k.unmapped,
+          }}
+          customerTrend={customerTrend}
+          tradeLaneTrend={tradeLaneTrend}
+        />
+
+        {k.unmapped > 0 && (
+          <div className="mt-4 text-xs text-warning-text bg-warning/40 rounded-md px-3 py-2 inline-block">
+            ⚠️ ${(k.unmapped / 1000).toFixed(1)}K of charges are not in your
+            &ldquo;Charge to Revenue Type Mapping&rdquo; sheet. Add them — the
+            next sync will pick them up.
+          </div>
+        )}
+      </div>
+    </CurrencyProvider>
   );
 }

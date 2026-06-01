@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
-import { titleCase, fmtUSD } from "@/lib/utils";
+import { titleCase } from "@/lib/utils";
+import { useCurrency, fmtMoney } from "@/lib/currency";
 
 interface DetailRow {
   _id: string;
@@ -48,6 +49,8 @@ export function DrillDownModal({ ctx, onClose }: Props) {
   const [truncated, setTruncated] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const cur = useCurrency();
+  const fmtAmt = (n: number) => fmtMoney(n, cur);
 
   useEffect(() => {
     if (!ctx) return;
@@ -111,7 +114,7 @@ export function DrillDownModal({ ctx, onClose }: Props) {
             </div>
             <div className="text-xs text-ink-tertiary mt-1 flex items-center gap-3 flex-wrap">
               <span>
-                Total: <span className="font-semibold text-ink-primary">{fmtUSD(total)}</span>
+                Total: <span className="font-semibold text-ink-primary">{fmtAmt(total)}</span>
               </span>
               <span>·</span>
               <span>{count.toLocaleString("en-IN")} invoice line(s)</span>
@@ -188,10 +191,10 @@ export function DrillDownModal({ ctx, onClose }: Props) {
                       {r.qty ? r.qty.toLocaleString("en-IN") : "—"}
                     </td>
                     <td className="px-3 py-2 text-right tabular-nums text-ink-secondary">
-                      {r.rate ? fmtUSD(r.rate) : "—"}
+                      {r.rate ? fmtAmt(r.rate) : "—"}
                     </td>
                     <td className="px-3 py-2 text-right tabular-nums font-medium text-ink-primary whitespace-nowrap">
-                      {fmtUSD(r.amountInChargeCurrency)}
+                      {fmtAmt(r.amountInChargeCurrency)}
                     </td>
                   </tr>
                 ))}
@@ -204,7 +207,7 @@ export function DrillDownModal({ ctx, onClose }: Props) {
                   >
                     Total
                   </td>
-                  <td className="px-3 py-2.5 text-right tabular-nums">{fmtUSD(total)}</td>
+                  <td className="px-3 py-2.5 text-right tabular-nums">{fmtAmt(total)}</td>
                 </tr>
               </tfoot>
             </table>

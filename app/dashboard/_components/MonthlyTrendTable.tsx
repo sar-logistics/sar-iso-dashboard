@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { ChevronRight, ChevronDown } from "lucide-react";
 import { titleCase } from "@/lib/utils";
+import { useCurrency, fmtMoneyCompact, convert } from "@/lib/currency";
 import { CustomerAvatar } from "./CustomerAvatar";
 import { DrillDownModal, DrillContext } from "./DrillDownModal";
 
@@ -32,14 +33,6 @@ interface Props {
   title: string;
 }
 
-function fmtCompact(n: number): string {
-  if (n === 0) return "—";
-  const abs = Math.abs(n);
-  const sign = n < 0 ? "-" : "";
-  if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(2)}M`;
-  if (abs >= 1_000) return `${sign}$${(abs / 1_000).toFixed(1)}K`;
-  return `${sign}$${abs.toFixed(0)}`;
-}
 function cellClass(n: number): string {
   if (n === 0) return "text-ink-tertiary";
   return n < 0 ? "num-neg" : "";
@@ -48,6 +41,9 @@ function cellClass(n: number): string {
 export function MonthlyTrendTable({ data, groupBy, title }: Props) {
   const { months, rows, grandTotal } = data;
   const [drill, setDrill] = useState<DrillContext | null>(null);
+  const cur = useCurrency();
+  const fmt = (n: number) =>
+    n === 0 ? "—" : fmtMoneyCompact(n, cur);
 
   // Track expanded customer blocks (default: all expanded)
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
@@ -96,15 +92,25 @@ export function MonthlyTrendTable({ data, groupBy, title }: Props) {
     let pol: string | null = null;
     let pod: string | null = null;
     let groupLabel: string;
+    let polEmpty = false;
+    let podEmpty = false;
 
     if (groupBy === "customer") {
       customer = isGrand ? null : group;
       groupLabel = isGrand ? "All Agents" : titleCase(group);
     } else {
       if (!isGrand) {
-        const [p, q] = group.split(" → ");
-        pol = p === "—" ? null : p;
-        pod = q === "—" ? null : q;
+        if (group === "No Trade Lane / Sundry") {
+          // Both POL and POD must be empty/missing
+          polEmpty = true;
+          podEmpty = true;
+        } else {
+          const [p, q] = group.split(" → ");
+          pol = p === "—" ? null : p;
+          pod = q === "—" ? null : q;
+          if (p === "—") polEmpty = true;
+          if (q === "—") podEmpty = true;
+        }
       }
       groupLabel = isGrand ? "All Trade Lanes" : group;
     }
@@ -113,6 +119,8 @@ export function MonthlyTrendTable({ data, groupBy, title }: Props) {
       customer,
       pol,
       pod,
+      polEmpty,
+      podEmpty,
       customerLabel: groupLabel,
       year: mo.year,
       month: mo.month,
@@ -178,6 +186,7 @@ export function MonthlyTrendTable({ data, groupBy, title }: Props) {
                 onToggleGroup={() => toggleGroup(grandTotal.group)}
                 onToggleBucket={(b) => toggleBucket(grandTotal.group, b)}
                 onDrill={(m, mo) => openDrill(grandTotal.group, true, m, mo)}
+                fmt={fmt}
               />
               {rows.map((block) => (
                 <BlockRows
@@ -190,6 +199,7 @@ export function MonthlyTrendTable({ data, groupBy, title }: Props) {
                   onToggleGroup={() => toggleGroup(block.group)}
                   onToggleBucket={(b) => toggleBucket(block.group, b)}
                   onDrill={(m, mo) => openDrill(block.group, false, m, mo)}
+                  fmt={fmt}
                 />
               ))}
               {rows.length === 0 && (
@@ -219,6 +229,7 @@ function BlockRows({
   onToggleGroup,
   onToggleBucket,
   onDrill,
+  fmt,
 }: {
   block: GroupBlock;
   months: { key: string; label: string; year: number; month: number }[];
@@ -229,6 +240,7 @@ function BlockRows({
   onToggleGroup: () => void;
   onToggleBucket: (bucket: string) => void;
   onDrill: (m: MetricRow, mo: typeof months[number]) => void;
+  fmt: (n: number) => string;
 }) {
   const groupLabel = isGrand
     ? block.group
@@ -323,7 +335,7 @@ function BlockRows({
             </td>
             <td className={`bg-surface-subtle/40 ${cellClass(m.total)}`}>
               <span className={m.level === "primary" ? "font-semibold" : ""}>
-                {fmtCompact(m.total)}
+                {fmt(m.total)}
               </span>
             </td>
             {months.map((mo) => {
@@ -336,10 +348,10 @@ function BlockRows({
                       className="hover:underline hover:text-info-text transition-colors cursor-pointer"
                       title={`Click for details — ${mo.label}`}
                     >
-                      {fmtCompact(v)}
+                      {fmt(v)}
                     </button>
                   ) : (
-                    <span>{fmtCompact(v)}</span>
+                    <span>{fmt(v)}</span>
                   )}
                 </td>
               );

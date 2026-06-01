@@ -25,7 +25,7 @@ function bucketFor(
   return "Other";
 }
 
-const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 // ISO week computation (week starts Monday, week 1 contains first Thursday of year)
 function getISOWeek(d: Date): { week: number; year: number } {
@@ -58,11 +58,11 @@ function periodLabel(view: ViewMode, year: number, month: number): string {
   const yy = String(year).slice(-2);
   switch (view) {
     case "weekly":
-      return `W${month} '${yy}`;
+      return `W${month} ${yy}`;
     case "monthly":
-      return `${MONTHS[month - 1]} '${yy}`;
+      return `${MONTHS[month - 1]} ${yy}`;
     case "quarterly":
-      return `Q${Math.ceil(month / 3)} '${yy}`;
+      return `Q${Math.ceil(month / 3)} ${yy}`;
     case "yearly":
       return `FY ${year}`;
   }
@@ -81,7 +81,7 @@ function buildWeeklyColumns(toDate: Date, numWeeks: number) {
     const { week, year } = getISOWeek(cursor);
     cols.unshift({
       key: `${year}-W${String(week).padStart(2, "0")}`,
-      label: `W${week} '${String(year).slice(-2)}`,
+      label: `W${week} ${String(year).slice(-2)}`,
       year,
       month: week, // store week number in `month` slot — used by drill (period start range)
     });

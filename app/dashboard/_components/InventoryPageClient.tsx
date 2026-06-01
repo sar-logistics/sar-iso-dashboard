@@ -19,12 +19,14 @@ interface Kpis {
   underRepair: number;
   underSurvey: number;
   sentToConsignee: number;
+  other: number;
 }
 
 interface Props {
   kpis: Kpis;
   byActivity: { label: string; count: number }[];
   byPrincipal: { label: string; count: number }[];
+  byAgent: { label: string; count: number }[];
   rows: InventoryNode[];
 }
 
@@ -32,6 +34,7 @@ export function InventoryPageClient({
   kpis,
   byActivity,
   byPrincipal,
+  byAgent,
   rows,
 }: Props) {
   const [drill, setDrill] = useState<InventoryDrillContext | null>(null);
@@ -62,7 +65,7 @@ export function InventoryPageClient({
 
   return (
     <>
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-9 gap-3 mb-6">
         <KPIClickable
           label="Total Tanks"
           value={kpis.total}
@@ -141,6 +144,14 @@ export function InventoryPageClient({
           }
           isCount
         />
+        <KPIClickable
+          label="Other Activity"
+          value={kpis.other}
+          subtitle="Movement, positioning, etc."
+          accent="bg-accent-purple"
+          onClick={() => onKpiClick("other", "Other Activity", kpis.other)}
+          isCount
+        />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
@@ -159,6 +170,29 @@ export function InventoryPageClient({
           valueFormatter={(n) => n.toLocaleString("en-IN")}
         />
       </div>
+
+      {byAgent.length > 0 && (
+        <div className="grid grid-cols-1 gap-4 mb-4">
+          <HorizontalBarChart
+            data={byAgent.map((a) => ({
+              name: a.label
+                .split(" ")
+                .map((w) =>
+                  w.length > 2
+                    ? w[0].toUpperCase() + w.slice(1).toLowerCase()
+                    : w
+                )
+                .join(" "),
+              value: a.count,
+            }))}
+            title="Tanks by Agent"
+            subtitle="Top 10 agents holding your tanks right now"
+            color="#A855F7"
+            valueFormatter={(n) => n.toLocaleString("en-IN")}
+            tooltipLabel="Tanks"
+          />
+        </div>
+      )}
 
       <InventoryPivotTable rows={rows} totalCount={kpis.total} />
 

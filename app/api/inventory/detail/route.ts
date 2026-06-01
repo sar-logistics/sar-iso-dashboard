@@ -34,7 +34,15 @@ export async function GET(req: NextRequest) {
       underSurvey: /SURVEY/i,
       sentToConsignee: /SENT TO CONSIGNEE/i,
     };
-    if (regexMap[kpiBucket]) filter.activityName = { $regex: regexMap[kpiBucket] };
+    if (kpiBucket === "other") {
+      // Containers whose activity does NOT match any of the known buckets
+      const knownPatterns = Object.values(regexMap).map((r) => r.source);
+      filter.activityName = {
+        $not: { $regex: knownPatterns.join("|"), $options: "i" },
+      };
+    } else if (regexMap[kpiBucket]) {
+      filter.activityName = { $regex: regexMap[kpiBucket] };
+    }
   }
 
   const db = await getDb();

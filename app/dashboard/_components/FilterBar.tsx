@@ -88,6 +88,42 @@ export function FilterBar({
 
   const isWeekly = selectedView === "weekly";
 
+  // Currency state — synced with URL
+  const currency = (sp.get("currency") || "USD").toUpperCase() === "INR"
+    ? "INR"
+    : "USD";
+  const urlRate = sp.get("inrRate") || "83";
+  const [localRate, setLocalRate] = useState(urlRate);
+  useEffect(() => {
+    setLocalRate(urlRate);
+  }, [urlRate]);
+
+  const handleCurrencyChange = (newCurrency: "USD" | "INR") => {
+    const params = new URLSearchParams(sp.toString());
+    if (newCurrency === "USD") {
+      params.delete("currency");
+      params.delete("inrRate");
+    } else {
+      params.set("currency", "INR");
+      // Default rate if not already set
+      if (!params.get("inrRate")) params.set("inrRate", "83");
+    }
+    navigate(params);
+  };
+
+  const commitRate = (raw: string) => {
+    const parsed = parseFloat(raw);
+    if (!isFinite(parsed) || parsed <= 0) {
+      setLocalRate(urlRate);
+      return;
+    }
+    if (String(parsed) === urlRate) return;
+    const params = new URLSearchParams(sp.toString());
+    params.set("currency", "INR");
+    params.set("inrRate", String(parsed));
+    navigate(params);
+  };
+
   return (
     <div className="card bg-white px-4 py-3 flex items-center flex-wrap gap-x-5 gap-y-2 mb-5 text-xs">
       <div className="flex items-center gap-2">
@@ -126,16 +162,46 @@ export function FilterBar({
           Currency
         </span>
         <div className="inline-flex bg-surface-muted rounded-md p-0.5">
-          <button className="px-2.5 py-1 rounded text-ink-primary bg-white shadow-sm font-medium">
+          <button
+            onClick={() => handleCurrencyChange("USD")}
+            className={`px-2.5 py-1 rounded text-xs font-medium transition ${
+              currency === "USD"
+                ? "text-ink-primary bg-white shadow-sm"
+                : "text-ink-tertiary hover:text-ink-primary"
+            }`}
+          >
             USD
           </button>
           <button
-            className="px-2.5 py-1 rounded text-ink-tertiary cursor-not-allowed"
-            title="INR view coming soon"
+            onClick={() => handleCurrencyChange("INR")}
+            className={`px-2.5 py-1 rounded text-xs font-medium transition ${
+              currency === "INR"
+                ? "text-ink-primary bg-white shadow-sm"
+                : "text-ink-tertiary hover:text-ink-primary"
+            }`}
           >
             INR
           </button>
         </div>
+        {currency === "INR" && (
+          <div className="inline-flex items-center gap-1.5">
+            <span className="text-ink-tertiary text-[10px]">@ ₹</span>
+            <input
+              type="number"
+              step="0.5"
+              min="1"
+              max="500"
+              value={localRate}
+              onChange={(e) => setLocalRate(e.target.value)}
+              onBlur={() => commitRate(localRate)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+              }}
+              className="w-16 bg-surface-muted px-2 py-1.5 rounded-md text-ink-primary border border-surface-border focus:ring-2 focus:ring-info focus:outline-none text-xs"
+            />
+            <span className="text-ink-tertiary text-[10px]">/ $</span>
+          </div>
+        )}
       </div>
 
       {isWeekly && (

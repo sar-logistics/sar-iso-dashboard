@@ -1,4 +1,5 @@
-import { fmtUSD } from "@/lib/utils";
+"use client";
+import { useCurrency, fmtMoney } from "@/lib/currency";
 
 interface KPICardProps {
   label: string;
@@ -6,9 +7,9 @@ interface KPICardProps {
   subtitle?: string;
   /** Tailwind background color class for top bar, e.g. "bg-accent-green" */
   accent: string;
-  /** Optional small warning text below value, e.g. "Behind target" */
+  /** Optional small warning text below value */
   warning?: string;
-  /** If true, format as currency. If false, render the value as a number. */
+  /** If true (default), format as currency. If false, render as plain number. */
   currency?: boolean;
 }
 
@@ -20,8 +21,9 @@ export function KPICard({
   warning,
   currency = true,
 }: KPICardProps) {
+  const cur = useCurrency();
   const formatted = currency
-    ? fmtUSD(value)
+    ? fmtMoney(value, cur)
     : value.toLocaleString("en-IN");
 
   return (

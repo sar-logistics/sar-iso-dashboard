@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { titleCase } from "@/lib/utils";
+import { useCurrency, fmtMoneyCompact, convert } from "@/lib/currency";
 import { KPICard } from "./KPICard";
 import { MonthlyTrendTable, MonthlyTrendData } from "./MonthlyTrendTable";
 import {
@@ -35,35 +36,41 @@ type TabId = (typeof TABS)[number]["id"];
 
 export function DashboardTabs({ kpis, customerTrend, tradeLaneTrend }: Props) {
   const [tab, setTab] = useState<TabId>("overview");
+  const cur = useCurrency();
+  const moneyFmt = (n: number) => fmtMoneyCompact(n, cur);
 
+  // Convert raw USD values to the chosen currency before charts render
   const topCustomers = customerTrend.rows.slice(0, 10).map((r) => ({
     name: titleCase(r.group),
-    value: r.total,
+    value: convert(r.total, cur),
   }));
 
-  // Trade lane chart should never include "No Trade Lane / Sundry" — that's
-  // bookkeeping noise and would dominate the visual. The detail table still
-  // shows it for transparency.
   const topTradeLanes = tradeLaneTrend.rows
     .filter((r) => r.group !== "No Trade Lane / Sundry")
     .slice(0, 10)
     .map((r) => ({
       name: r.group,
-      value: r.total,
+      value: convert(r.total, cur),
     }));
 
   const revenueMix = [
-    { name: "Lease", value: kpis.lease },
-    { name: "Detention", value: kpis.detention },
-    { name: "EXIM", value: kpis.exim },
-    { name: "M&R", value: kpis.mr },
-    ...(kpis.unmapped > 0 ? [{ name: "Unmapped", value: kpis.unmapped }] : []),
+    { name: "Lease", value: convert(kpis.lease, cur) },
+    { name: "Detention", value: convert(kpis.detention, cur) },
+    { name: "EXIM", value: convert(kpis.exim, cur) },
+    { name: "M&R", value: convert(kpis.mr, cur) },
+    ...(kpis.unmapped > 0
+      ? [{ name: "Unmapped", value: convert(kpis.unmapped, cur) }]
+      : []),
   ].filter((d) => d.value > 0);
 
-  // Monthly trend = grand-total primary row across the period
   const monthlyTrend = customerTrend.months.map((m) => {
-    const primary = customerTrend.grandTotal.metrics.find((x) => x.level === "primary");
-    return { month: m.label, value: primary?.monthly[m.key] || 0 };
+    const primary = customerTrend.grandTotal.metrics.find(
+      (x) => x.level === "primary"
+    );
+    return {
+      month: m.label,
+      value: convert(primary?.monthly[m.key] || 0, cur),
+    };
   });
 
   return (
@@ -125,11 +132,13 @@ export function DashboardTabs({ kpis, customerTrend, tradeLaneTrend }: Props) {
               title="Revenue by Trade Lane"
               subtitle="Top 10 trade lanes (excludes sundry / no-BL entries)"
               color="#3B82F6"
+              valueFormatter={moneyFmt}
             />
             <DonutChart
               data={revenueMix}
               title="Revenue Mix"
               subtitle="Distribution by charge category"
+              valueFormatter={moneyFmt}
             />
           </div>
 
@@ -139,12 +148,14 @@ export function DashboardTabs({ kpis, customerTrend, tradeLaneTrend }: Props) {
               title="Top Agents"
               subtitle="Top 10 agents by total revenue"
               color="#22C55E"
+              valueFormatter={moneyFmt}
             />
             <MonthlyTrendLine
               data={monthlyTrend}
               title="Revenue Trend"
               subtitle="Total revenue per period (net of credit notes)"
               color="#A855F7"
+              valueFormatter={moneyFmt}
             />
           </div>
         </>
