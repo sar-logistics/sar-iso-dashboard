@@ -11,6 +11,12 @@ import { DashboardTabs } from "./_components/DashboardTabs";
 import { CurrencyProvider } from "@/lib/currency-context";
 import { parseCurrencyParams } from "@/lib/currency-utils";
 
+// Force fresh server rendering every time — never serve cached HTML.
+// This is critical for the "Last sync" timestamp and any data that changes
+// from minute to minute via cron.
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 function toIsoDate(d: Date): string {
   return d.toISOString().slice(0, 10);
 }

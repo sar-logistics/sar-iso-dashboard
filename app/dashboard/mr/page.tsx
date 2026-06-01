@@ -3,6 +3,10 @@ import { buildDepotData } from "@/lib/depotData";
 import { getDb } from "@/lib/mongodb";
 import { MRTabs } from "../_components/MRTabs";
 
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 async function getLastSync(sheetName: string) {
   const db = await getDb();
   const arr = await db
