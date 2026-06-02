@@ -45,6 +45,12 @@ export function InventoryPivotTable({ rows, totalCount }: Props) {
   };
 
   const k = (n: InventoryNode) => `${n.principal || ""}|${n.activity || ""}|${n.level}`;
+  const fmtPct = (n: number) => {
+    if (totalCount === 0) return "—";
+    const p = (n / totalCount) * 100;
+    if (p < 0.1) return "<0.1%";
+    return `${p.toFixed(1)}%`;
+  };
 
   return (
     <>
@@ -80,6 +86,9 @@ export function InventoryPivotTable({ rows, totalCount }: Props) {
               <th className="text-right px-4 py-2 font-medium w-32">
                 Tank Count
               </th>
+              <th className="text-right px-4 py-2 font-medium w-24">
+                % of Total
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -104,6 +113,9 @@ export function InventoryPivotTable({ rows, totalCount }: Props) {
                 >
                   {totalCount.toLocaleString("en-IN")}
                 </button>
+              </td>
+              <td className="text-right px-4 py-2.5 tabular-nums text-ink-tertiary">
+                100%
               </td>
             </tr>
 
@@ -146,6 +158,9 @@ export function InventoryPivotTable({ rows, totalCount }: Props) {
                         {principal.count.toLocaleString("en-IN")}
                       </button>
                     </td>
+                    <td className="text-right px-4 py-2 tabular-nums text-ink-tertiary">
+                      {fmtPct(principal.count)}
+                    </td>
                   </tr>
 
                   {/* Activity rows (children) */}
@@ -167,6 +182,9 @@ export function InventoryPivotTable({ rows, totalCount }: Props) {
                           >
                             {activity.count.toLocaleString("en-IN")}
                           </button>
+                        </td>
+                        <td className="text-right px-4 py-1.5 tabular-nums text-ink-tertiary text-[12px]">
+                          {fmtPct(activity.count)}
                         </td>
                       </tr>
                     ))}

@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { KPICard } from "./KPICard";
-import { HorizontalBarChart, DonutChart } from "./RevenueCharts";
+import { HorizontalBarChart } from "./RevenueCharts";
 import { InventoryPivotTable } from "./InventoryPivotTable";
 import {
   InventoryDrillModal,
@@ -47,16 +47,6 @@ export function InventoryPageClient({
       kpi,
     });
   };
-
-  // Top 8 activities for donut (rest grouped as "Other")
-  const donutData = (() => {
-    const top = byActivity.slice(0, 7);
-    const others = byActivity.slice(7);
-    const otherSum = others.reduce((s, x) => s + x.count, 0);
-    const data = top.map((a) => ({ name: a.label, value: a.count }));
-    if (otherSum > 0) data.push({ name: "Other", value: otherSum });
-    return data;
-  })();
 
   const principalBarData = byPrincipal.map((p) => ({
     name: titleCase(p.label),
@@ -163,16 +153,7 @@ export function InventoryPageClient({
           valueFormatter={(n) => n.toLocaleString("en-IN")}
           tooltipLabel="Tanks"
         />
-        <DonutChart
-          data={donutData}
-          title="Tanks by Activity"
-          subtitle="Current status distribution"
-          valueFormatter={(n) => n.toLocaleString("en-IN")}
-        />
-      </div>
-
-      {byAgent.length > 0 && (
-        <div className="grid grid-cols-1 gap-4 mb-4">
+        {byAgent.length > 0 ? (
           <HorizontalBarChart
             data={byAgent.map((a) => ({
               name: a.label
@@ -191,8 +172,10 @@ export function InventoryPageClient({
             valueFormatter={(n) => n.toLocaleString("en-IN")}
             tooltipLabel="Tanks"
           />
-        </div>
-      )}
+        ) : (
+          <div />
+        )}
+      </div>
 
       <InventoryPivotTable rows={rows} totalCount={kpis.total} />
 
