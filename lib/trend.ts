@@ -552,3 +552,125 @@ export async function getEffectiveDateRange(
 
   return { fromDate: effFrom, toDate: effTo };
 }
+
+/* ===== Period list helpers — drives the "Period" dropdown ===== */
+
+export interface PeriodOption {
+  key: string;        // URL-safe identifier, e.g. "2026-01" or "2026-Q1" or "2026" or "2026-W12"
+  label: string;      // Display label, e.g. "Jan 26"
+  fromIso: string;    // yyyy-mm-dd
+  toIso: string;      // yyyy-mm-dd
+}
+
+/**
+ * Compute the available periods for a given view, based on the actual
+ * min/max invoiceDate in MongoDB.
+ */
+export async function getAvailablePeriods(view: ViewMode): Promise<PeriodOption[]> {
+  const db = await getDb();
+  const r = await db
+    .collection("salesRegister")
+    .aggregate([
+      { $match: { invoiceDate: { $ne: null } } },
+      {
+        $group: {
+          _id: null,
+          min: { $min: "$invoiceDate" },
+          max: { $max: "$invoiceDate" },
+        },
+      },
+    ])
+    .toArray();
+  if (!r[0]?.min || !r[0]?.max) return [];
+
+  const minD = new Date(r[0].min);
+  const maxD = new Date(r[0].max);
+
+  const out: PeriodOption[] = [];
+  const isoDate = (d: Date) => d.toISOString().slice(0, 10);
+
+  if (view === "monthly") {
+    // Walk month by month from minD down to maxD; emit each
+    let y = minD.getUTCFullYear();
+    let m = minD.getUTCMonth();
+    const endY = maxD.getUTCFullYear();
+    const endM = maxD.getUTCMonth();
+    while (y < endY || (y === endY && m <= endM)) {
+      const start = new Date(Date.UTC(y, m, 1));
+      const end = new Date(Date.UTC(y, m + 1, 0, 23, 59, 59, 999));
+      out.push({
+        key: `${y}-${String(m + 1).padStart(2, "0")}`,
+        label: `${MONTHS[m]} ${String(y).slice(-2)}`,
+        fromIso: isoDate(start),
+        toIso: isoDate(end),
+      });
+      m++;
+      if (m > 11) { m = 0; y++; }
+    }
+  } else if (view === "quarterly") {
+    let y = minD.getUTCFullYear();
+    let q = Math.floor(minD.getUTCMonth() / 3);
+    const endY = maxD.getUTCFullYear();
+    const endQ = Math.floor(maxD.getUTCMonth() / 3);
+    while (y < endY || (y === endY && q <= endQ)) {
+      const startMonth = q * 3;
+      const start = new Date(Date.UTC(y, startMonth, 1));
+      const end = new Date(Date.UTC(y, startMonth + 3, 0, 23, 59, 59, 999));
+      out.push({
+        key: `${y}-Q${q + 1}`,
+        label: `Q${q + 1} ${String(y).slice(-2)}`,
+        fromIso: isoDate(start),
+        toIso: isoDate(end),
+      });
+      q++;
+      if (q > 3) { q = 0; y++; }
+    }
+  } else if (view === "yearly") {
+    for (let y = minD.getUTCFullYear(); y <= maxD.getUTCFullYear(); y++) {
+      const start = new Date(Date.UTC(y, 0, 1));
+      const end = new Date(Date.UTC(y, 11, 31, 23, 59, 59, 999));
+      out.push({
+        key: `${y}`,
+        label: `FY ${y}`,
+        fromIso: isoDate(start),
+        toIso: isoDate(end),
+      });
+    }
+  } else if (view === "weekly") {
+    // ISO weeks from minD to maxD
+    const start = new Date(Date.UTC(
+      minD.getUTCFullYear(), minD.getUTCMonth(), minD.getUTCDate()
+    ));
+    const end = new Date(Date.UTC(
+      maxD.getUTCFullYear(), maxD.getUTCMonth(), maxD.getUTCDate()
+    ));
+    // Walk Mondays
+    // Normalize start to its Monday
+    const startDay = start.getUTCDay() || 7; // Sunday=0 → 7
+    start.setUTCDate(start.getUTCDate() - (startDay - 1));
+    let cursor = new Date(start);
+    while (cursor <= end) {
+      // ISO week number
+      const target = new Date(cursor);
+      target.setUTCDate(target.getUTCDate() + 3 - ((target.getUTCDay() + 6) % 7));
+      const week1 = new Date(Date.UTC(target.getUTCFullYear(), 0, 4));
+      const weekNo = 1 + Math.round(
+        ((target.getTime() - week1.getTime()) / 86_400_000 -
+          3 + ((week1.getUTCDay() + 6) % 7)) / 7
+      );
+      const weekEnd = new Date(cursor);
+      weekEnd.setUTCDate(weekEnd.getUTCDate() + 6);
+      weekEnd.setUTCHours(23, 59, 59, 999);
+      out.push({
+        key: `${target.getUTCFullYear()}-W${String(weekNo).padStart(2, "0")}`,
+        label: `W${weekNo} ${String(target.getUTCFullYear()).slice(-2)}`,
+        fromIso: isoDate(cursor),
+        toIso: isoDate(weekEnd),
+      });
+      cursor.setUTCDate(cursor.getUTCDate() + 7);
+    }
+  }
+
+  // Most recent first — much nicer for picking the latest month
+  return out.reverse();
+}

@@ -3,10 +3,19 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 
+interface PeriodOption {
+  key: string;
+  label: string;
+  fromIso: string;
+  toIso: string;
+}
+
 interface Props {
   currentView: "monthly" | "weekly" | "quarterly" | "yearly" | "custom";
   currentFrom: string;
   currentTo: string;
+  currentPeriod: string;
+  availablePeriods: PeriodOption[];
   fromLabel: string;
   toLabel: string;
   lastSyncedAt?: Date;
@@ -48,6 +57,8 @@ export function FilterBar({
   currentView,
   currentFrom,
   currentTo,
+  currentPeriod,
+  availablePeriods,
   lastSyncedAt,
   rowsSynced,
 }: Props) {
@@ -65,7 +76,11 @@ export function FilterBar({
 
   const handleViewChange = (newView: string) => {
     const params = new URLSearchParams(sp.toString());
-    // Switching view: keep any explicit dates the user has set
+    // Switching view invalidates the picked period (Q1 26 makes no sense in monthly)
+    // and any explicit dates
+    params.delete("period");
+    params.delete("from");
+    params.delete("to");
     if (newView === "monthly") {
       params.delete("view");
     } else {
@@ -74,15 +89,29 @@ export function FilterBar({
     navigate(params);
   };
 
+  const handlePeriodChange = (periodKey: string) => {
+    const params = new URLSearchParams(sp.toString());
+    if (!periodKey) {
+      // "All recent" selected → clear specific period
+      params.delete("period");
+      params.delete("from");
+      params.delete("to");
+    } else {
+      const opt = availablePeriods.find((p) => p.key === periodKey);
+      if (!opt) return;
+      params.set("period", periodKey);
+      params.set("from", opt.fromIso);
+      params.set("to", opt.toIso);
+    }
+    navigate(params);
+  };
+
   const handleDateChange = (which: "from" | "to", value: string) => {
     const params = new URLSearchParams(sp.toString());
+    // Manual date edit means the named period no longer matches → clear it
+    params.delete("period");
     if (value) params.set(which, value);
     else params.delete(which);
-    // If user is editing dates while a named view is active, keep that view.
-    // Only flip to "custom" if neither view nor date params existed before.
-    if (!params.get("view") && (params.get("from") || params.get("to"))) {
-      // user is on default monthly + setting dates — keep monthly
-    }
     navigate(params);
   };
 
@@ -132,6 +161,25 @@ export function FilterBar({
         </span>
         <ViewDropdown current={selectedView} onChange={handleViewChange} />
       </div>
+
+      {selectedView !== "custom" && availablePeriods.length > 0 && (
+        <div className="flex items-center gap-2">
+          <span className="text-ink-tertiary uppercase tracking-wider text-[10px] font-medium">
+            {selectedView === "monthly"
+              ? "Month"
+              : selectedView === "quarterly"
+              ? "Quarter"
+              : selectedView === "yearly"
+              ? "Year"
+              : "Week"}
+          </span>
+          <PeriodDropdown
+            current={currentPeriod}
+            options={availablePeriods}
+            onChange={handlePeriodChange}
+          />
+        </div>
+      )}
 
       <div className="flex items-center gap-2">
         <span className="text-ink-tertiary uppercase tracking-wider text-[10px] font-medium">
@@ -275,6 +323,81 @@ function ViewDropdown({
                   ? "bg-info/30 text-ink-primary font-medium"
                   : "text-ink-secondary"
               } ${opt.disabled ? "cursor-not-allowed opacity-50" : ""}`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PeriodDropdown({
+  current,
+  options,
+  onChange,
+}: {
+  current: string;
+  options: PeriodOption[];
+  onChange: (key: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, []);
+
+  const currentOpt = options.find((o) => o.key === current);
+  const currentLabel = currentOpt?.label || "All recent";
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen(!open)}
+        className="bg-surface-muted hover:bg-surface-border transition px-3 py-1.5 rounded-md inline-flex items-center gap-2 text-ink-primary text-xs font-medium min-w-[110px] justify-between"
+      >
+        {currentLabel}
+        <ChevronDown
+          size={14}
+          className={open ? "rotate-180 transition" : "transition"}
+        />
+      </button>
+      {open && (
+        <div className="absolute top-full left-0 mt-1.5 bg-white border border-surface-border rounded-md shadow-lg min-w-[160px] py-1 z-20 max-h-[300px] overflow-y-auto">
+          <button
+            onClick={() => {
+              onChange("");
+              setOpen(false);
+            }}
+            className={`w-full text-left px-3 py-2 text-xs hover:bg-surface-muted transition italic ${
+              current === ""
+                ? "bg-info/30 text-ink-primary font-medium"
+                : "text-ink-secondary"
+            }`}
+          >
+            All recent
+          </button>
+          <div className="border-t border-surface-border my-1" />
+          {options.map((opt) => (
+            <button
+              key={opt.key}
+              onClick={() => {
+                onChange(opt.key);
+                setOpen(false);
+              }}
+              className={`w-full text-left px-3 py-2 text-xs hover:bg-surface-muted transition ${
+                opt.key === current
+                  ? "bg-info/30 text-ink-primary font-medium"
+                  : "text-ink-secondary"
+              }`}
             >
               {opt.label}
             </button>

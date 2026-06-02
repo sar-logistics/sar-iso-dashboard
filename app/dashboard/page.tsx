@@ -6,6 +6,7 @@ import {
   monthRangeLabel,
   parseViewParams,
   getEffectiveDateRange,
+  getAvailablePeriods,
 } from "@/lib/trend";
 import { DashboardTabs } from "./_components/DashboardTabs";
 import { CurrencyProvider } from "@/lib/currency-context";
@@ -86,6 +87,7 @@ export default async function DashboardHome({
     view?: string;
     from?: string;
     to?: string;
+    period?: string;
     currency?: string;
     inrRate?: string;
   };
@@ -99,10 +101,11 @@ export default async function DashboardHome({
   );
   const currencyState = parseCurrencyParams(searchParams);
 
-  const [k, customerTrend, tradeLaneTrend] = await Promise.all([
+  const [k, customerTrend, tradeLaneTrend, periods] = await Promise.all([
     loadKpis(fromDate, toDate),
     buildPeriodTrend("customer", { view, fromDate, toDate, topN: 10 }),
     buildPeriodTrend("tradeLane", { view, fromDate, toDate, topN: 10 }),
+    getAvailablePeriods(view),
   ]);
 
   const range = monthRangeLabel(customerTrend.months);
@@ -131,6 +134,8 @@ export default async function DashboardHome({
             currentView={searchParams.view === "custom" ? "custom" : view}
             currentFrom={searchParams.from || toIsoDate(fromDate)}
             currentTo={searchParams.to || toIsoDate(toDate)}
+            currentPeriod={searchParams.period || ""}
+            availablePeriods={periods}
             fromLabel={range.from}
             toLabel={range.to}
             lastSyncedAt={k.lastSync?.syncedAt}
