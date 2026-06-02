@@ -115,7 +115,22 @@ export function FilterBar({
     navigate(params);
   };
 
-  const isWeekly = selectedView === "weekly";
+  // Whether ANY filter is active (period, dates, custom view, non-default currency)
+  const hasActiveFilter =
+    !!sp.get("period") ||
+    !!sp.get("from") ||
+    !!sp.get("to") ||
+    !!sp.get("view");
+
+  const clearFilters = () => {
+    const params = new URLSearchParams();
+    // Preserve currency choice — it's a display preference, not a data filter
+    const cur = sp.get("currency");
+    const rate = sp.get("inrRate");
+    if (cur) params.set("currency", cur);
+    if (rate) params.set("inrRate", rate);
+    navigate(params);
+  };
 
   // Currency state — synced with URL
   const currency = (sp.get("currency") || "USD").toUpperCase() === "INR"
@@ -181,29 +196,47 @@ export function FilterBar({
         </div>
       )}
 
-      <div className="flex items-center gap-2">
-        <span className="text-ink-tertiary uppercase tracking-wider text-[10px] font-medium">
-          From
-        </span>
-        <input
-          type="date"
-          value={toInputDate(currentFrom)}
-          onChange={(e) => handleDateChange("from", e.target.value)}
-          className="bg-surface-muted px-2.5 py-1.5 rounded-md text-ink-primary border border-surface-border focus:ring-2 focus:ring-info focus:outline-none text-xs"
-        />
-      </div>
+      {selectedView === "custom" && (
+        <>
+          <div className="flex items-center gap-2">
+            <span className="text-ink-tertiary uppercase tracking-wider text-[10px] font-medium">
+              From
+            </span>
+            <input
+              type="date"
+              value={toInputDate(currentFrom)}
+              onChange={(e) => handleDateChange("from", e.target.value)}
+              className="bg-surface-muted px-2.5 py-1.5 rounded-md text-ink-primary border border-surface-border focus:ring-2 focus:ring-info focus:outline-none text-xs"
+            />
+          </div>
 
-      <div className="flex items-center gap-2">
-        <span className="text-ink-tertiary uppercase tracking-wider text-[10px] font-medium">
-          To
-        </span>
-        <input
-          type="date"
-          value={toInputDate(currentTo)}
-          onChange={(e) => handleDateChange("to", e.target.value)}
-          className="bg-surface-muted px-2.5 py-1.5 rounded-md text-ink-primary border border-surface-border focus:ring-2 focus:ring-info focus:outline-none text-xs"
-        />
-      </div>
+          <div className="flex items-center gap-2">
+            <span className="text-ink-tertiary uppercase tracking-wider text-[10px] font-medium">
+              To
+            </span>
+            <input
+              type="date"
+              value={toInputDate(currentTo)}
+              onChange={(e) => handleDateChange("to", e.target.value)}
+              className="bg-surface-muted px-2.5 py-1.5 rounded-md text-ink-primary border border-surface-border focus:ring-2 focus:ring-info focus:outline-none text-xs"
+            />
+          </div>
+        </>
+      )}
+
+      {hasActiveFilter && (
+        <button
+          onClick={clearFilters}
+          className="px-3 py-1.5 rounded-md text-xs font-medium text-ink-secondary hover:text-ink-primary hover:bg-surface-muted transition inline-flex items-center gap-1.5 border border-surface-border"
+          title="Reset all filters to defaults"
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M18 6L6 18" />
+            <path d="M6 6l12 12" />
+          </svg>
+          Clear filters
+        </button>
+      )}
 
       <div className="flex items-center gap-2">
         <span className="text-ink-tertiary uppercase tracking-wider text-[10px] font-medium">
@@ -252,10 +285,9 @@ export function FilterBar({
         )}
       </div>
 
-      {isWeekly && (
+      {selectedView === "custom" && (
         <div className="text-[11px] text-ink-tertiary italic">
-          Weekly view shows at most 5 weeks. Wider ranges are auto-trimmed to
-          the most recent 5 weeks.
+          Pick any From/To range
         </div>
       )}
 
