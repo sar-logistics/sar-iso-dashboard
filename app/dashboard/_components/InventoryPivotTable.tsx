@@ -85,7 +85,7 @@ export function InventoryPivotTable({ rows, totalCount }: Props) {
           <tbody>
             {/* All-tanks grand total row */}
             <tr className="border-b border-surface-border bg-surface-subtle font-semibold">
-              <td className="px-4 py-2.5">
+              <td className="px-4 py-2.5 text-left">
                 <div className="inline-flex items-center gap-2 pl-1">
                   <CustomerAvatar name="AL" />
                   <span>ALL TANKS</span>
@@ -117,7 +117,7 @@ export function InventoryPivotTable({ rows, totalCount }: Props) {
                     key={k(principal)}
                     className="border-b border-surface-border hover:bg-surface-subtle/50"
                   >
-                    <td className="px-4 py-2">
+                    <td className="px-4 py-2 text-left">
                       <div className="inline-flex items-center gap-2 pl-2">
                         <button
                           onClick={() => toggle(principalKey)}
@@ -155,10 +155,10 @@ export function InventoryPivotTable({ rows, totalCount }: Props) {
                         key={k(activity)}
                         className="border-b border-surface-border hover:bg-surface-subtle/50"
                       >
-                        <td className="px-4 py-1.5">
-                          <span className="pl-14 text-ink-secondary text-[12px] uppercase tracking-wide">
+                        <td className="px-4 py-1.5 text-left">
+                          <div className="pl-14 text-ink-secondary text-[12px] uppercase tracking-wide">
                             {activity.label}
-                          </span>
+                          </div>
                         </td>
                         <td className="text-right px-4 py-1.5 tabular-nums">
                           <button

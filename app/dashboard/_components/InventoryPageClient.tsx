@@ -75,11 +75,11 @@ export function InventoryPageClient({
           isCount
         />
         <KPIClickable
-          label="Empty Available"
+          label="Empty Tanks"
           value={kpis.empty}
-          subtitle="Ready for booking"
+          subtitle="Available + allocated"
           accent="bg-accent-blue"
-          onClick={() => onKpiClick("empty", "Empty Available", kpis.empty)}
+          onClick={() => onKpiClick("empty", "Empty Tanks", kpis.empty)}
           isCount
         />
         <KPIClickable
