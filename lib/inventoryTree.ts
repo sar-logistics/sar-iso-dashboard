@@ -3,14 +3,11 @@ import { getDb } from "@/lib/mongodb";
 export interface InventoryNode {
   label: string;
   count: number;
-  level: "principal" | "activity" | "from" | "to" | "agent";
+  level: "principal" | "activity";
   children?: InventoryNode[];
   // Filter context — used by drill-down
   principal?: string;
   activity?: string;
-  fromLocation?: string;
-  toLocation?: string;
-  agent?: string;
 }
 
 export interface InventoryTree {
@@ -43,7 +40,6 @@ function classify(activity: string) {
     underSurvey: a.includes("SURVEY") ? 1 : 0,
     sentToConsignee: a.includes("SENT TO CONSIGNEE") ? 1 : 0,
   };
-  // If no bucket matched, count as "Other Activity"
   const matched =
     c.empty +
     c.loadedFull +
@@ -56,7 +52,7 @@ function classify(activity: string) {
 }
 
 /**
- * Build a 5-level tree: Principal → Activity → From → To → Agent.
+ * Build a 2-level tree: Principal → Activity.
  * Each leaf has a container count.
  */
 export async function buildInventoryTree(): Promise<InventoryTree> {
@@ -70,9 +66,6 @@ export async function buildInventoryTree(): Promise<InventoryTree> {
           _id: {
             principal: { $ifNull: ["$principal", "—"] },
             activity: { $ifNull: ["$activityName", "—"] },
-            fromLocation: { $ifNull: ["$fromLocation", "—"] },
-            toLocation: { $ifNull: ["$toLocation", "—"] },
-            agent: { $ifNull: ["$agent", "—"] },
           },
           count: { $sum: 1 },
         },
@@ -81,23 +74,8 @@ export async function buildInventoryTree(): Promise<InventoryTree> {
     ])
     .toArray();
 
-  // Map: principal → activity → from → to → agent → count
-  type LeafAgent = { label: string; count: number };
-  type LeafTo = {
-    label: string;
-    count: number;
-    children: Record<string, LeafAgent>;
-  };
-  type LeafFrom = {
-    label: string;
-    count: number;
-    children: Record<string, LeafTo>;
-  };
-  type LeafActivity = {
-    label: string;
-    count: number;
-    children: Record<string, LeafFrom>;
-  };
+  // Map: principal → activity → count
+  type LeafActivity = { label: string; count: number };
   type LeafPrincipal = {
     label: string;
     count: number;
@@ -108,7 +86,6 @@ export async function buildInventoryTree(): Promise<InventoryTree> {
   let totalCount = 0;
   const activityTotals: Record<string, number> = {};
   const principalTotals: Record<string, number> = {};
-  const agentTotals: Record<string, number> = {};
 
   const kpis = {
     total: 0,
@@ -125,16 +102,11 @@ export async function buildInventoryTree(): Promise<InventoryTree> {
   for (const row of agg) {
     const principal = String(row._id.principal || "—").trim() || "—";
     const activity = String(row._id.activity || "—").trim() || "—";
-    const fromLoc = String(row._id.fromLocation || "—").trim() || "—";
-    const toLoc = String(row._id.toLocation || "—").trim() || "—";
-    const agent = String(row._id.agent || "—").trim() || "—";
     const count = row.count as number;
 
     totalCount += count;
     activityTotals[activity] = (activityTotals[activity] || 0) + count;
     principalTotals[principal] = (principalTotals[principal] || 0) + count;
-    if (agent !== "—")
-      agentTotals[agent] = (agentTotals[agent] || 0) + count;
 
     const c = classify(activity);
     kpis.total += count;
@@ -152,45 +124,27 @@ export async function buildInventoryTree(): Promise<InventoryTree> {
     tree[principal].count += count;
 
     if (!tree[principal].children[activity])
-      tree[principal].children[activity] = {
-        label: activity,
-        count: 0,
-        children: {},
-      };
+      tree[principal].children[activity] = { label: activity, count: 0 };
     tree[principal].children[activity].count += count;
-
-    if (!tree[principal].children[activity].children[fromLoc])
-      tree[principal].children[activity].children[fromLoc] = {
-        label: fromLoc,
-        count: 0,
-        children: {},
-      };
-    tree[principal].children[activity].children[fromLoc].count += count;
-
-    if (
-      !tree[principal].children[activity].children[fromLoc].children[toLoc]
-    )
-      tree[principal].children[activity].children[fromLoc].children[toLoc] = {
-        label: toLoc,
-        count: 0,
-        children: {},
-      };
-    tree[principal].children[activity].children[fromLoc].children[toLoc].count +=
-      count;
-
-    if (
-      !tree[principal].children[activity].children[fromLoc].children[toLoc]
-        .children[agent]
-    )
-      tree[principal].children[activity].children[fromLoc].children[
-        toLoc
-      ].children[agent] = { label: agent, count: 0 };
-    tree[principal].children[activity].children[fromLoc].children[toLoc].children[
-      agent
-    ].count += count;
   }
 
-  // Convert to sorted nested array structure
+  // Agent totals — still computed separately for the "Tanks by Agent" chart
+  // (independent of the drill table, so keeping the chart is cheap and useful)
+  const agentAgg = await col
+    .aggregate([
+      { $match: { agent: { $exists: true, $ne: null, $nin: ["", "—"] } } },
+      {
+        $group: {
+          _id: { $ifNull: ["$agent", "—"] },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { count: -1 } },
+      { $limit: 10 },
+    ])
+    .toArray();
+
+  // Convert tree to sorted array
   const rows: InventoryNode[] = Object.values(tree)
     .sort((a, b) => b.count - a.count)
     .map((p) => ({
@@ -206,39 +160,6 @@ export async function buildInventoryTree(): Promise<InventoryTree> {
           level: "activity" as const,
           principal: p.label,
           activity: a.label,
-          children: Object.values(a.children)
-            .sort((x, y) => y.count - x.count)
-            .map((f) => ({
-              label: f.label,
-              count: f.count,
-              level: "from" as const,
-              principal: p.label,
-              activity: a.label,
-              fromLocation: f.label,
-              children: Object.values(f.children)
-                .sort((x, y) => y.count - x.count)
-                .map((t) => ({
-                  label: t.label,
-                  count: t.count,
-                  level: "to" as const,
-                  principal: p.label,
-                  activity: a.label,
-                  fromLocation: f.label,
-                  toLocation: t.label,
-                  children: Object.values(t.children)
-                    .sort((x, y) => y.count - x.count)
-                    .map((g) => ({
-                      label: g.label,
-                      count: g.count,
-                      level: "agent" as const,
-                      principal: p.label,
-                      activity: a.label,
-                      fromLocation: f.label,
-                      toLocation: t.label,
-                      agent: g.label,
-                    })),
-                })),
-            })),
         })),
     }));
 
@@ -251,10 +172,10 @@ export async function buildInventoryTree(): Promise<InventoryTree> {
     .slice(0, 10)
     .map(([label, count]) => ({ label, count }));
 
-  const byAgent = Object.entries(agentTotals)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 10)
-    .map(([label, count]) => ({ label, count }));
+  const byAgent = agentAgg.map((r: any) => ({
+    label: String(r._id || "—"),
+    count: r.count as number,
+  }));
 
   return { rows, totalCount, byActivity, byPrincipal, byAgent, kpis };
 }
