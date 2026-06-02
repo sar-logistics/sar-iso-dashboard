@@ -144,8 +144,6 @@ export function InventoryDrillModal({ ctx, onClose }: Props) {
                   <th className="px-3 py-2.5 text-left">Type</th>
                   <th className="px-3 py-2.5 text-left">Principal</th>
                   <th className="px-3 py-2.5 text-left">Activity</th>
-                  <th className="px-3 py-2.5 text-left">Date</th>
-                  <th className="px-3 py-2.5 text-right">Idle Days</th>
                   <th className="px-3 py-2.5 text-left">Agent</th>
                   <th className="px-3 py-2.5 text-left">From</th>
                   <th className="px-3 py-2.5 text-left">To</th>
@@ -168,24 +166,6 @@ export function InventoryDrillModal({ ctx, onClose }: Props) {
                     </td>
                     <td className="px-3 py-2 text-ink-secondary">
                       {r.activityName}
-                    </td>
-                    <td className="px-3 py-2 text-ink-secondary">
-                      {fmtDate(r.activityDate)}
-                    </td>
-                    <td className="px-3 py-2 text-right tabular-nums">
-                      {r.idleDays != null ? (
-                        <span
-                          className={
-                            r.idleDays > 60
-                              ? "text-warning-text font-medium"
-                              : "text-ink-secondary"
-                          }
-                        >
-                          {r.idleDays}
-                        </span>
-                      ) : (
-                        "—"
-                      )}
                     </td>
                     <td className="px-3 py-2 text-ink-secondary">
                       {titleCase(r.agent)}
