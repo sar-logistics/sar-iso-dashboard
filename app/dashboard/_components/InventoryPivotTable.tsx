@@ -76,7 +76,7 @@ export function InventoryPivotTable({ rows, totalCount }: Props) {
         <table className="trend-table w-full">
           <thead>
             <tr className="bg-surface-subtle border-b border-surface-border text-[10px] uppercase tracking-wider text-ink-tertiary">
-              <th className="text-left px-4 py-2 font-medium">Group</th>
+              <th className="left px-4 py-2 font-medium">Group</th>
               <th className="text-right px-4 py-2 font-medium w-32">
                 Tank Count
               </th>
@@ -85,7 +85,7 @@ export function InventoryPivotTable({ rows, totalCount }: Props) {
           <tbody>
             {/* All-tanks grand total row */}
             <tr className="border-b border-surface-border bg-surface-subtle font-semibold">
-              <td className="px-4 py-2.5 text-left">
+              <td className="left px-4 py-2.5">
                 <div className="inline-flex items-center gap-2 pl-1">
                   <CustomerAvatar name="AL" />
                   <span>ALL TANKS</span>
@@ -117,7 +117,7 @@ export function InventoryPivotTable({ rows, totalCount }: Props) {
                     key={k(principal)}
                     className="border-b border-surface-border hover:bg-surface-subtle/50"
                   >
-                    <td className="px-4 py-2 text-left">
+                    <td className="left px-4 py-2">
                       <div className="inline-flex items-center gap-2 pl-2">
                         <button
                           onClick={() => toggle(principalKey)}
@@ -155,7 +155,7 @@ export function InventoryPivotTable({ rows, totalCount }: Props) {
                         key={k(activity)}
                         className="border-b border-surface-border hover:bg-surface-subtle/50"
                       >
-                        <td className="px-4 py-1.5 text-left">
+                        <td className="left px-4 py-1.5">
                           <div className="pl-14 text-ink-secondary text-[12px] uppercase tracking-wide">
                             {activity.label}
                           </div>
