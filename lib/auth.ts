@@ -1,10 +1,6 @@
 import { AuthOptions, getServerSession } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
-
-const allowedEmails = (process.env.ALLOWED_EMAILS || "")
-  .split(",")
-  .map((e) => e.trim().toLowerCase())
-  .filter(Boolean);
+import { isAllowed } from "@/lib/allowedUsers";
 
 export const authOptions: AuthOptions = {
   providers: [
@@ -19,7 +15,11 @@ export const authOptions: AuthOptions = {
     async signIn({ user }) {
       const email = (user?.email || "").toLowerCase();
       if (!email) return false;
-      return allowedEmails.includes(email);
+      // Two-layer allowlist check:
+      //  1) ALLOWED_EMAILS env var (always allowed, lockout-proof)
+      //  2) allowedUsers MongoDB collection (added via admin panel)
+      // If Mongo is unreachable, isAllowed() falls back to env-only.
+      return await isAllowed(email);
     },
     async session({ session, token }) {
       if (session.user && token.sub) {
