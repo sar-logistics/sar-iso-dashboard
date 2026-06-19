@@ -2,6 +2,8 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
+import { signOut, useSession } from "next-auth/react";
+import { LogOut } from "lucide-react";
 
 const NAV_SECTIONS = [
   {
@@ -23,6 +25,7 @@ const NAV_SECTIONS = [
 
 export function SidebarNav() {
   const pathname = usePathname();
+  const { data: session } = useSession();
 
   const isActive = (href: string) => {
     if (href === "/dashboard") return pathname === "/dashboard";
@@ -36,7 +39,7 @@ export function SidebarNav() {
         <div className="flex justify-center mb-2">
           <Image
             src="/sar-logo.jpg"
-            alt="SAR · Connecting Continents"
+            alt="SAR \u00b7 Connecting Continents"
             width={140}
             height={79}
             priority
@@ -76,6 +79,33 @@ export function SidebarNav() {
           </div>
         ))}
       </nav>
+
+      {/* User identity + sign out — at the bottom */}
+      <div className="border-t border-surface-border px-4 py-3">
+        {session?.user?.email && (
+          <div
+            className="text-[11px] text-ink-primary mb-1.5 truncate font-medium"
+            title={session.user.email}
+          >
+            {session.user.name || session.user.email}
+          </div>
+        )}
+        {session?.user?.email && session?.user?.name && (
+          <div
+            className="text-[10px] text-ink-tertiary mb-2 truncate"
+            title={session.user.email}
+          >
+            {session.user.email}
+          </div>
+        )}
+        <button
+          onClick={() => signOut({ callbackUrl: "/login" })}
+          className="w-full inline-flex items-center gap-2 px-2 py-1.5 rounded-md text-xs text-ink-secondary hover:text-negative hover:bg-negative/10 transition"
+        >
+          <LogOut size={14} />
+          Sign out
+        </button>
+      </div>
     </aside>
   );
 }

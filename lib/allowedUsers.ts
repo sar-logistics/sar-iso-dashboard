@@ -109,6 +109,28 @@ export async function addAllowedUser(
 }
 
 /**
+ * Update the role of a mongo-source user. Env-locked admins cannot be modified.
+ * Returns true if updated, false if user is env-locked or not found.
+ */
+export async function updateUserRole(
+  email: string,
+  role: "admin" | "viewer"
+): Promise<{ ok: boolean; reason?: string }> {
+  const e = email.trim().toLowerCase();
+  if (isEnvAdmin(e)) {
+    return { ok: false, reason: "Env-locked admins cannot be modified via UI" };
+  }
+  const db = await getDb();
+  const r = await db
+    .collection("allowedUsers")
+    .updateOne({ email: e }, { $set: { role } });
+  if (r.matchedCount === 0) {
+    return { ok: false, reason: "User not found" };
+  }
+  return { ok: true };
+}
+
+/**
  * Remove an allowed user. Returns false if the email is an env admin
  * (cannot be removed via UI).
  */
