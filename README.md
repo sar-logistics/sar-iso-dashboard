@@ -42,7 +42,7 @@ Copy `.env.local.example` to `.env.local` and fill in:
 
 ```env
 # MongoDB
-MONGODB_URI="mongodb+srv://USER:PASS@cluster.mongodb.net/sar_iso_dashboard?retryWrites=true&w=majority"
+MONGODB_URI="mongodb+srv://USER:PASS@cluster.mongodb.net/sar_iso?retryWrites=true&w=majority"
 
 # NextAuth
 NEXTAUTH_URL="http://localhost:3000"
